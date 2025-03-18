@@ -1,0 +1,27 @@
+# for strain nl43
+
+nl43.D1 = "GGGGCGGCGACTG"
+nl43.D1-unspliced = "GTGAGTACGCCAAAAA"
+nl43.A1 = "GGACAGCAGAGA"
+nl43.A2 = "AATCTGCTATAA"
+
+# work on later
+
+nl43.D2 = "A"
+nl43.D2-unspliced = "G"
+nl43.D2b = "A"
+nl43.D2b-unspliced = "G"
+nl43.D3 = "A"
+nl43.D3-unspliced = "G"
+
+nl43.A3 = "C"
+nl43.A4a = "C"
+nl43.A4b = "C"
+nl43.A4c = "C"
+nl43.A4d = "C"
+nl43.A5a = "C"
+nl43.A5b = "C"
+nl43.A7 = "C"
+
+
+

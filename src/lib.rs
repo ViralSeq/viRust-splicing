@@ -1,0 +1,76 @@
+use std::error::Error;
+use std::fs::File;
+use std::io::BufReader;
+use bio::io::fasta;
+
+pub mod config;
+pub mod joined_umi_sequence;
+pub mod splice_events;
+
+// pub mod splice_events;
+
+use crate::config::InputConfig;
+
+
+pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
+
+    let forward_n_size = 4; // consider moving to master config
+    let umi_size = 14; // consider moving to master config
+
+    let query = config.query;
+    let distance = config.distance;
+
+    let r1_file_path = &config.filename_r1;
+    let r2_file_path = &config.filename_r2;
+
+    let fasta_reader_r1 = open_fasta_file(r1_file_path)?;
+    let fasta_reader_r2 = open_fasta_file(r2_file_path)?;
+
+    let r1_records = fasta_reader_r1.records();
+    let r2_records = fasta_reader_r2.records();
+
+    let splice_config = config::SpliceConfig::build(query, distance)?;
+
+    for (r1_record, r2_record) in r1_records.zip(r2_records) {
+        let mut joined_umi_sequence = joined_umi_sequence::JoinedUmiSequnce::from_fasta_record(
+            &r1_record?,
+            &r2_record?,
+            forward_n_size,
+            umi_size);
+
+        joined_umi_sequence.join();
+
+        // to do
+
+        let splice_events = joined_umi_sequence.check_splice_event(&splice_config);
+
+        println!("{:?}", splice_events.splice_category.splice_event.join("_"));
+
+    }
+
+
+    Ok(())
+}
+
+pub fn open_fasta_file(file_path: &str) -> Result<fasta::Reader<BufReader<BufReader<File>>>, Box<dyn Error>> {
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
+    Ok(fasta::Reader::new(reader))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use joined_umi_sequence::pattern_search;
+
+    #[test]
+    fn test_pattern_search() {
+        let pattern = b"TTTTCCTAGGATATGGCTCCATAACTTAGGACAA";
+        let nl43_file = "tests/nl43.fasta";
+        let fasta_reader = open_fasta_file(nl43_file).unwrap();
+        let record = fasta_reader.records().next().unwrap().unwrap();
+        let sequence = record.seq().to_vec();
+        let aln = pattern_search(&sequence, pattern, 2).unwrap();
+        assert_eq!((aln.ystart, aln.yend, aln.score), (4913, 4947, 0));
+    }
+}
