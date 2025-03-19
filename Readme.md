@@ -10,11 +10,11 @@ Rust App to analyze NGS data to detect HIV splice forms.
   init: {
     'theme': 'base',
     'themeVariables': {
-      'primaryColor': '#92DEFC',
+      'primaryColor': '#1966C9',
       'primaryTextColor': '#FEFFE2',
-      'primaryBorderColor': '#D0E69E',
-      'lineColor': '#FDE4DE',
-      'secondaryColor': '#FF8BA0',
+      'primaryBorderColor': '#FEFFE2',
+      'lineColor': '#FEFFE2',
+      'secondaryColor': '#F87C07',
       'tertiaryColor': '#FF8BA0'
     }
   }
