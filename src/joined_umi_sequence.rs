@@ -68,224 +68,140 @@ impl JoinedUmiSequnce {
 
     pub fn check_splice_event(&self, splice_config: &SpliceConfig) -> SpliceEvents {
         let seq = self.find_sequence_for_search();
-        let mut sequence_to_search = seq.as_bytes();
-        let distance = splice_config.distance;
-        let mut splice_chain = SpliceChain::new();
-
-        let d1 = splice_config.d1.clone();
-        let d2 = splice_config.d2.clone();
-        let d2b = splice_config.d2b.clone();
-        let d3 = splice_config.d3.clone();
-
-        let d1_to_all = &splice_config.d1_to_all;
-        let d2_to_all = &splice_config.d2_to_all;
-        let d2b_to_all = &splice_config.d2b_to_all;
-        let d3_to_all = &splice_config.d3_to_all;
-
-
-        // step 1, check D1
-
-        match pattern_search_trim_seq(sequence_to_search, &d1.as_bytes(), distance) {
-            Some(trimmed) => {
-                splice_chain.add_splice_event("D1".to_string());
-                sequence_to_search = trimmed;
-                
-                // step2, check after D1
-
-                match pattern_search_trim_seq_batch(sequence_to_search, d1_to_all, distance) {
-                    Some((matched_acceptor, trimmed)) => {
-                        splice_chain.add_splice_event(matched_acceptor.clone());
-                        sequence_to_search = trimmed;
-
-                        match matched_acceptor.as_str() {
-                            "A1" => 
-                            {
-                                // step 3, check if D2 is present
-                                
-                                match pattern_search_trim_seq(sequence_to_search, &d2.as_bytes(), distance) {
-                                    Some(trimmed) =>
-                                    {
-                                        splice_chain.add_splice_event("D2".to_string());
-                                        sequence_to_search = trimmed;
-
-                                        // step 4, when D2 is present check after D2
-
-                                        match pattern_search_trim_seq_batch(sequence_to_search, d2_to_all, distance) {
-
-                                            Some((matched_acceptor, trimmed)) => {
-                                                splice_chain.add_splice_event(matched_acceptor.clone());
-                                                sequence_to_search = trimmed;
-
-                                                match matched_acceptor.as_str() {
-                                                    "D2-unspliced" => 
-                                                    {
-                                                        // step 5, when D2 is not spliced, check if D2b is present
-                                                        
-                                                        match pattern_search_trim_seq(sequence_to_search, &d2b.as_bytes(), distance) {
-                                                            Some(trimmed) => {
-                                                                splice_chain.add_splice_event("D2b".to_string());
-                                                                sequence_to_search = trimmed;
-
-                                                                // step 6, check downstream of D2b
-
-                                                                match pattern_search_trim_seq_batch(sequence_to_search, d2b_to_all, distance) {
-                                                                    Some((matched_acceptor, trimmed)) => {
-                                                                        splice_chain.add_splice_event(matched_acceptor.clone());
-                                                                        sequence_to_search = trimmed;
-
-                                                                        match matched_acceptor.as_str() {
-                                                                            "A2" => 
-                                                                            {
-                                                                                // step 7, when A2 is present, check D3
-                                                                                match pattern_search_trim_seq(sequence_to_search, &d3.as_bytes(), distance) {
-                                                                                    Some(trimmed) => {
-                                                                                        splice_chain.add_splice_event("D3".to_string());
-                                                                                        sequence_to_search = trimmed;
-                                                                                        
-                                                                                        // step 8 check downstream of D3, end of all regardless of the match
-                                                                            
-                                                                                        match pattern_search_trim_seq_batch(sequence_to_search, d3_to_all, distance) {
-                                                                                            Some((matched_acceptor, trimmed)) => {
-                                                                                                splice_chain.add_splice_event(matched_acceptor.clone());
-                                                                                                sequence_to_search = trimmed;
-                                                                                            },
-                                                                                            None => {
-                                                                                                // end of the splicing chain at step 8
-                                                                                                splice_chain.add_splice_event("unknown".to_string());
-                                                                                            }
-                                                                                        }                       
-                                                                                    },
-                                                                                    None =>
-                                                                                    {
-                                                                                        //D3 absent, end of the splicing chain at step 7
-                                                                                        splice_chain.add_splice_event("noD3".to_string());
-                                                                        
-                                                                                    }
-                                                                                }
-                                                                            },
-                                                                            // other downstream acceptors (A3-A7), end of the splicing chain at step 7
-                                                                            _ => {}
-                                                                        }
-
-                                                                    },
-                                                                    None => {
-                                                                        // end of the splicing chain at step 6
-                                                                        splice_chain.add_splice_event("unknown".to_string());
-                                                                    }
-                                                                }
-
-                                                            },
-                                                            None => {
-                                                                // end of the splicing chain at step 5 when D2b is absent
-                                                                splice_chain.add_splice_event("noD2b".to_string());
-                                                            }
-                                                        }
-
-                                                    },
-                                                   "A2" =>
-                                                    {
-                                                        // step 5, when D2 is spliced, check D3
-                                                        match pattern_search_trim_seq(sequence_to_search, &d3.as_bytes(), distance) {
-                                                            Some(trimmed) => {
-                                                                splice_chain.add_splice_event("D3".to_string());
-                                                                sequence_to_search = trimmed;
-                                                                
-                                                                // step 6 check downstream of D3, end of all regardless of the match
-                        
-                                                                match pattern_search_trim_seq_batch(sequence_to_search, d3_to_all, distance) {
-                                                                    Some((matched_acceptor, trimmed)) => {
-                                                                        splice_chain.add_splice_event(matched_acceptor.clone());
-                                                                        sequence_to_search = trimmed;
-                                                                    },
-                                                                    None => {
-                                                                        // end of the splicing chain at step 4
-                                                                        splice_chain.add_splice_event("unknown".to_string());
-                                                                    }
-                                                                }                       
-                                                            },
-                                                            None =>
-                                                            {
-                                                                //D3 absent, end of the splicing chain at step 6
-                                                                splice_chain.add_splice_event("noD3".to_string());
-                        
-                                                            }
-                                                        }
-
-                                                    },
-                                                  // other downstream acceptors (A3-A7), end of the splicing chain at step 4
-                                                    _ => {
-
-                                                    }
-                                                };
-                                            },
-                                            None => {
-                                                // end of the splicing chain at step 4
-                                                splice_chain.add_splice_event("unknown".to_string());
-                                            }
-                                        };
-
-                                    },
-                                    None => 
-                                    {
-                                        // D2 absent, end of the splicing chain at step 3
-                                        splice_chain.add_splice_event("noD2".to_string());
-                                        
-                                    }
-                                }
-                            },
-                            "A2" => 
-                            {
-                                // step 3, parrell, check D3
-                                match pattern_search_trim_seq(sequence_to_search, &d3.as_bytes(), distance) {
-                                    Some(trimmed) => {
-                                        splice_chain.add_splice_event("D3".to_string());
-                                        sequence_to_search = trimmed;
-                                        
-                                        // step 4 check downstream of D3, end of all regardless of the match
-
-                                        match pattern_search_trim_seq_batch(sequence_to_search, d3_to_all, distance) {
-                                            Some((matched_acceptor, trimmed)) => {
-                                                splice_chain.add_splice_event(matched_acceptor.clone());
-                                                sequence_to_search = trimmed;
-                                            },
-                                            None => {
-                                                // end of the splicing chain at step 4
-                                                splice_chain.add_splice_event("unknown".to_string());
-                                            }
-                                        }
-                                    },
-                                    None =>
-                                    {
-                                        //D3 absent, end of the splicing chain at step 3
-                                        splice_chain.add_splice_event("noD3".to_string());
-
-                                    }
-                                }
-                            },
-                            // matching with D1-unspliced, A3-A7, end of splicing chain at step 2
-                            _ => {}
-                        }                        
-                    },
-                    None => {
-
-                        // unknown acceptor after D1, end of splicing chain at step 2
-                        splice_chain.add_splice_event("unknown".to_string());
-                    }
-                }
-            },
-            None => {
-
-                // no D1, end of splicing chain at step 1
-                splice_chain.add_splice_event("noD1".to_string());
-            }
-        }
-
-        let mut event = SpliceEvents::from_joined_umi_with_event(&self, splice_chain);
-        event.add_post_splice_sequence(String::from_utf8(sequence_to_search.to_vec()).unwrap());
-
+        let seq = seq.as_bytes();
+        let mut chain = SpliceChain::new();
+        // Start processing at stage 1 (which handles D1).
+        let final_seq = process_splice_rec(seq, &mut chain, splice_config, 1);
+        let mut event = SpliceEvents::from_joined_umi_with_event(self, chain);
+        event.add_post_splice_sequence(String::from_utf8(final_seq.to_vec()).unwrap());
         event
     }
 
+}
+
+/// Recursive helper that processes splicing steps based on the stage.
+///  
+/// The stages are defined as:
+/// - **1:** Search for D1.
+/// - **2:** Find acceptor downstream of D1.
+///   - If acceptor is `"A1"`, continue to stage 3.
+///   - If acceptor is `"A2"`, jump to stage 5.
+/// - **3:** Search for D2 (A1 branch).
+/// - **4:** Find acceptor downstream of D2.
+///   - If acceptor is `"D2-unspliced"`, continue to stage 6.
+///   - If acceptor is `"A2"`, jump to stage 5.
+/// - **5:** Process the common D3 branch (for both A2 outcomes).
+/// - **6:** Search for D2b (in the D2-unspliced branch).
+///   - If an acceptor from D2b is found and it is `"A2"`, jump to stage 5.
+/// - **7:** Look for an acceptor after D3.
+///  
+/// If any pattern isn’t found, an appropriate event (e.g. `"noD1"`, `"unknown"`) is added and the current sequence is returned.
+fn process_splice_rec<'a>(
+    seq: &'a [u8],
+    chain: &mut SpliceChain,
+    config: &SpliceConfig,
+    stage: u8,
+) -> &'a [u8] {
+    let distance = config.distance;
+    match stage {
+        // Stage 1: Process D1.
+        1 => {
+            if let Some(new_seq) = pattern_search_trim_seq(seq, config.d1.as_bytes(), distance) {
+                chain.add_splice_event("D1".to_string());
+                process_splice_rec(new_seq, chain, config, 2)
+            } else {
+                chain.add_splice_event("noD1".to_string());
+                seq
+            }
+        },
+        // Stage 2: Process the acceptor immediately after D1.
+        2 => {
+            if let Some((acc, new_seq)) =
+                pattern_search_trim_seq_batch(seq, &config.d1_to_all, distance)
+            {
+                chain.add_splice_event(acc.clone());
+                match acc.as_str() {
+                    "A1" => process_splice_rec(new_seq, chain, config, 3),
+                    "A2" => process_splice_rec(new_seq, chain, config, 5),
+                    _ => new_seq,
+                }
+            } else {
+                chain.add_splice_event("unknown".to_string());
+                seq
+            }
+        },
+        // Stage 3: Process D2 (for the A1 branch).
+        3 => {
+            if let Some(new_seq) = pattern_search_trim_seq(seq, config.d2.as_bytes(), distance) {
+                chain.add_splice_event("D2".to_string());
+                process_splice_rec(new_seq, chain, config, 4)
+            } else {
+                chain.add_splice_event("noD2".to_string());
+                seq
+            }
+        },
+        // Stage 4: Process acceptor after D2.
+        4 => {
+            if let Some((acc, new_seq)) =
+                pattern_search_trim_seq_batch(seq, &config.d2_to_all, distance)
+            {
+                chain.add_splice_event(acc.clone());
+                match acc.as_str() {
+                    "D2-unspliced" => process_splice_rec(new_seq, chain, config, 6),
+                    "A2" => process_splice_rec(new_seq, chain, config, 5),
+                    _ => new_seq,
+                }
+            } else {
+                chain.add_splice_event("unknown".to_string());
+                seq
+            }
+        },
+        // Stage 5: Process D3 branch (common for any A2 outcome).
+        5 => {
+            if let Some(new_seq) = pattern_search_trim_seq(seq, config.d3.as_bytes(), distance) {
+                chain.add_splice_event("D3".to_string());
+                process_splice_rec(new_seq, chain, config, 7)
+            } else {
+                chain.add_splice_event("noD3".to_string());
+                seq
+            }
+        },
+        // Stage 6: Process D2b for the "D2-unspliced" branch.
+        6 => {
+            if let Some(new_seq) = pattern_search_trim_seq(seq, config.d2b.as_bytes(), distance) {
+                chain.add_splice_event("D2b".to_string());
+                if let Some((acc, new_seq2)) =
+                    pattern_search_trim_seq_batch(new_seq, &config.d2b_to_all, distance)
+                {
+                    chain.add_splice_event(acc.clone());
+                    if acc == "A2" {
+                        process_splice_rec(new_seq2, chain, config, 5)
+                    } else {
+                        new_seq2
+                    }
+                } else {
+                    chain.add_splice_event("unknown".to_string());
+                    seq
+                }
+            } else {
+                chain.add_splice_event("noD2b".to_string());
+                seq
+            }
+        },
+        // Stage 7: Process the acceptor downstream of D3.
+        7 => {
+            if let Some((acc, new_seq)) =
+                pattern_search_trim_seq_batch(seq, &config.d3_to_all, distance)
+            {
+                chain.add_splice_event(acc.clone());
+                new_seq
+            } else {
+                chain.add_splice_event("unknown".to_string());
+                seq
+            }
+        },
+        _ => seq,
+    }
 }
 
 /// Compute the reverse complement of a DNA sequence.
