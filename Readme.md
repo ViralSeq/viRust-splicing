@@ -1,5 +1,7 @@
 # HIV Splicing analysis
 
+Rust App to analyze NGS data to detect HIV splice forms.
+
 ## Splice Event Idenfitication Workflow
 
 ```mermaid
