@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use bio::io::fasta;
+use rayon::prelude::*;
 
 pub mod config;
 pub mod joined_umi_sequence;
@@ -26,28 +27,34 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     let fasta_reader_r1 = open_fasta_file(r1_file_path)?;
     let fasta_reader_r2 = open_fasta_file(r2_file_path)?;
 
-    let r1_records = fasta_reader_r1.records();
-    let r2_records = fasta_reader_r2.records();
+    // collect records
+    let records: Result<Vec<_>, Box<dyn Error>> = fasta_reader_r1
+        .records()
+        .zip(fasta_reader_r2.records())
+        .map(|(r1, r2)| Ok((r1?, r2?)))
+        .collect();
+
+    let records = records?;
 
     let splice_config = config::SpliceConfig::build(query, distance)?;
 
-    for (r1_record, r2_record) in r1_records.zip(r2_records) {
+    let splice_events: Vec<_> = records.par_iter().map(|(r1_record, r2_record)| {
         let mut joined_umi_sequence = joined_umi_sequence::JoinedUmiSequnce::from_fasta_record(
-            &r1_record?,
-            &r2_record?,
+            &r1_record,
+            &r2_record,
             forward_n_size,
             umi_size);
 
         joined_umi_sequence.join();
 
-        // to do
+        joined_umi_sequence.check_splice_event(&splice_config)
 
-        let splice_events = joined_umi_sequence.check_splice_event(&splice_config);
+    }).collect();
 
-        println!("{:?}", splice_events.splice_category.splice_event.join("_"));
 
+    for splice_event in splice_events {
+        println!("{:?}", splice_event);
     }
-
 
     Ok(())
 }
