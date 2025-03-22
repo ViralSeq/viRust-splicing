@@ -4,20 +4,41 @@ use bio::alphabets::dna;
 use serde::{Deserialize, Serialize};
 use bio::pattern_matching::myers;
 use bio::alignment::Alignment;
+use std::error::Error;
 use crate::config::{SpliceConfig, SpliceStep};
 use crate::splice_events::{SpliceEvents, SpliceChain};
 
+/// Represents a joined UMI sequence derived from paired-end FASTA records.
+/// 
+/// This struct contains metadata and sequences extracted from the forward and reverse reads,
+/// as well as the joined sequence if the reads are successfully merged.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct JoinedUmiSequnce {
+    /// The sequence ID derived from the forward read.
     pub sequence_id: String,
+    /// The first few bases of the forward read, used as a unique identifier.
     pub forward_ns: String,
+    /// The UMI (Unique Molecular Identifier) extracted from the reverse read.
     pub umi: String,
+    /// The remaining sequence of the forward read after the forward Ns.
     pub forward_sequence: String,
+    /// The remaining sequence of the reverse read after the UMI.
     pub reverse_sequence: String,
+    /// The joined sequence obtained by merging the forward and reverse reads.
     pub joined_sequence: Option<String>,
 }
 
 impl JoinedUmiSequnce {
+    /// Creates a `JoinedUmiSequnce` from paired-end FASTA records.
+    ///
+    /// # Arguments
+    /// * `record_r1` - The forward read record.
+    /// * `record_r2` - The reverse read record.
+    /// * `forward_n_size` - The number of bases to extract as forward Ns.
+    /// * `umi_size` - The number of bases to extract as the UMI.
+    ///
+    /// # Returns
+    /// A new `JoinedUmiSequnce` instance.
     pub fn from_fasta_record (record_r1: &fasta::Record, record_r2: &fasta::Record, forward_n_size: usize, umi_size: usize) -> JoinedUmiSequnce {
         let sequence_id = record_r1.id()[..(record_r1.id().len() - 3)].to_string();
 
@@ -40,6 +61,9 @@ impl JoinedUmiSequnce {
         }
     }
 
+    /// Attempts to join the forward and reverse sequences into a single contiguous sequence.
+    ///
+    /// This method uses a minimum overlap and error rate to determine if the reads can be merged.
     pub fn join(&mut self) {
         let min_overlap = 10; // Minimum overlap length required for merging. Consider moving to master config.
         let error_rate = 0.02; // Maximum error rate allowed in the overlap region. Consider moving to master config.
@@ -48,6 +72,10 @@ impl JoinedUmiSequnce {
         }
     }
 
+    /// Converts the joined sequence into a FASTA record.
+    ///
+    /// # Returns
+    /// An `Option<fasta::Record>` containing the joined sequence, or `None` if the sequence is not joined.
     pub fn joined_seq_to_fasta_record(&self) -> Option<fasta::Record> {
         let id = format!("{}-joined", self.sequence_id);
         let desc = Some(format!("ForwardNs: {}, UMI: {}", self.forward_ns, self.umi));
@@ -59,6 +87,12 @@ impl JoinedUmiSequnce {
         }
     }
 
+    /// Finds the sequence to use for searching splice events.
+    ///
+    /// If the joined sequence exists, it is returned. Otherwise, the forward and reverse sequences are concatenated.
+    ///
+    /// # Returns
+    /// A `String` containing the sequence for search.
     pub fn find_sequence_for_search(&self) -> String {
         match &self.joined_sequence {
             Some(joined_sequence) => joined_sequence.to_string(),
@@ -66,21 +100,29 @@ impl JoinedUmiSequnce {
         }
     }
 
-    pub fn check_splice_event(&self, splice_config: &SpliceConfig) -> SpliceEvents {
+    /// Checks for splice events in the sequence using the provided splice configuration.
+    ///
+    /// # Arguments
+    /// * `splice_config` - The configuration for splice event detection.
+    ///
+    /// # Returns
+    /// A `Result` containing the detected `SpliceEvents` or an error.
+    pub fn check_splice_event(&self, splice_config: &SpliceConfig) -> Result<SpliceEvents, Box<dyn Error>> {
         let seq = self.find_sequence_for_search();
         let seq = seq.as_bytes();
         let mut chain = SpliceChain::new();
         // Start processing at stage 1 (which handles D1).
         let final_seq = process_splice_rec(seq, &mut chain, splice_config, 1);
         let mut event = SpliceEvents::from_joined_umi_with_event(self, chain);
-        event.add_post_splice_sequence(String::from_utf8(final_seq.to_vec()).unwrap());
-        event
+        event.add_post_splice_sequence(String::from_utf8(final_seq.to_vec())?);
+        event.find_size_class(splice_config)?;
+        Ok(event)
     }
 
 }
 
-/// Recursive helper that processes splicing steps based on the stage.
-///  
+/// Processes splicing steps recursively based on the stage.
+///
 /// The stages are defined as:
 /// - **1:** Search for D1.
 /// - **2:** Find acceptor downstream of D1.
@@ -94,8 +136,9 @@ impl JoinedUmiSequnce {
 /// - **6:** Search for D2b (in the D2-unspliced branch).
 ///   - If an acceptor from D2b is found and it is `"A2"`, jump to stage 5.
 /// - **7:** Look for an acceptor after D3.
-///  
-/// If any pattern isn’t found, an appropriate event (e.g. `"noD1"`, `"unknown"`) is added and the current sequence is returned.
+///
+/// # Returns
+/// The remaining sequence after processing.
 fn process_splice_rec<'a>(
     seq: &'a [u8],
     chain: &mut SpliceChain,
@@ -204,8 +247,13 @@ fn process_splice_rec<'a>(
     }
 }
 
-/// Compute the reverse complement of a DNA sequence.
-/// Use the `dna` alphabet from the `bio` crate for maximum performance.
+/// Computes the reverse complement of a DNA sequence.
+///
+/// # Arguments
+/// * `seq` - The DNA sequence to reverse complement.
+///
+/// # Returns
+/// A `String` containing the reverse complement of the input sequence.
 fn reverse_complement(seq: &str) -> String {
     seq.chars()
         .rev()
@@ -216,8 +264,15 @@ fn reverse_complement(seq: &str) -> String {
         .unwrap()
 }
 
-/// Check if the overlap between two sequence slices is acceptable given the error rate.
-/// The overlap is acceptable if the fraction of mismatched bases is less than or equal to `error_rate`.
+/// Checks if the overlap between two sequences is acceptable given the error rate.
+///
+/// # Arguments
+/// * `s1` - The first sequence.
+/// * `s2` - The second sequence.
+/// * `error_rate` - The maximum allowed error rate.
+///
+/// # Returns
+/// `true` if the overlap is acceptable, `false` otherwise.
 fn is_overlap_acceptable(s1: &str, s2: &str, error_rate: f64) -> bool {
     let overlap_length = s1.len();
     let mismatches = s1
@@ -229,8 +284,16 @@ fn is_overlap_acceptable(s1: &str, s2: &str, error_rate: f64) -> bool {
     (mismatches as f64) <= (overlap_length as f64 * error_rate)
 }
 
-/// Find the maximum overlap between the suffix of `r1` and the prefix of `r2` that meets the error rate threshold.
-/// Returns the length of the acceptable overlap if at least `min_overlap` bases match (within error rate), or None otherwise.
+/// Finds the maximum overlap between two sequences that meets the error rate threshold.
+///
+/// # Arguments
+/// * `r1` - The first sequence.
+/// * `r2` - The second sequence.
+/// * `min_overlap` - The minimum required overlap length.
+/// * `error_rate` - The maximum allowed error rate.
+///
+/// # Returns
+/// An `Option<usize>` containing the length of the acceptable overlap, or `None` if no overlap is found.
 fn find_overlap(r1: &str, r2: &str, min_overlap: usize, error_rate: f64) -> Option<usize> {
     let max_overlap = r1.len().min(r2.len());
     // Check overlaps from largest possible to min_overlap
@@ -244,8 +307,16 @@ fn find_overlap(r1: &str, r2: &str, min_overlap: usize, error_rate: f64) -> Opti
     None
 }
 
-/// Join two paired-end reads by reverse-complementing R2, finding an overlapping region
-/// (allowing for a sequencing error rate), and merging them into one contiguous sequence.
+/// Joins two paired-end reads by reverse-complementing the second read and merging them.
+///
+/// # Arguments
+/// * `r1` - The forward read.
+/// * `r2` - The reverse read.
+/// * `min_overlap` - The minimum required overlap length.
+/// * `error_rate` - The maximum allowed error rate.
+///
+/// # Returns
+/// An `Option<String>` containing the joined sequence, or `None` if the reads cannot be merged.
 fn join_reads(r1: &str, r2: &str, min_overlap: usize, error_rate: f64) -> Option<String> {
     let r2_rc = reverse_complement(r2);
     if let Some(overlap) = find_overlap(r1, &r2_rc, min_overlap, error_rate) {
@@ -257,6 +328,15 @@ fn join_reads(r1: &str, r2: &str, min_overlap: usize, error_rate: f64) -> Option
     }
 }
 
+/// Searches for a pattern in a sequence using the Myers algorithm.
+///
+/// # Arguments
+/// * `sequence` - The sequence to search.
+/// * `pattern` - The pattern to search for.
+/// * `distance` - The maximum allowed edit distance.
+///
+/// # Returns
+/// An `Option<Alignment>` containing the best alignment, or `None` if no match is found.
 pub fn pattern_search(sequence: &[u8], pattern: &[u8], distance: u8) -> Option<Alignment> {
 
     let mut aln = Alignment::default();
@@ -275,6 +355,15 @@ pub fn pattern_search(sequence: &[u8], pattern: &[u8], distance: u8) -> Option<A
     }
 }
 
+/// Searches for a pattern in a sequence and trims the sequence up to the match.
+///
+/// # Arguments
+/// * `sequence` - The sequence to search.
+/// * `pattern` - The pattern to search for.
+/// * `distance` - The maximum allowed edit distance.
+///
+/// # Returns
+/// An `Option<&[u8]>` containing the trimmed sequence, or `None` if no match is found.
 pub fn pattern_search_trim_seq<'a>(sequence: &'a [u8], pattern: &[u8], distance: u8) -> Option<&'a [u8]> {
 
     let mut aln = Alignment::default();
@@ -293,6 +382,15 @@ pub fn pattern_search_trim_seq<'a>(sequence: &'a [u8], pattern: &[u8], distance:
     }
 }
 
+/// Searches for multiple patterns in a sequence and trims the sequence up to the first match.
+///
+/// # Arguments
+/// * `sequence` - The sequence to search.
+/// * `list` - A list of splice steps containing patterns and acceptors.
+/// * `distance` - The maximum allowed edit distance.
+///
+/// # Returns
+/// An `Option<(String, &[u8])>` containing the matched acceptor and the trimmed sequence, or `None` if no match is found.
 pub fn pattern_search_trim_seq_batch<'a>(sequence: &'a [u8], list: &Vec<SpliceStep>, distance: u8) -> Option<(String, &'a [u8])> {
 
     for step in list {

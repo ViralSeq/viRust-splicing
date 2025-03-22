@@ -16,4 +16,5 @@ fn main() {
         eprintln!("Application error: {}", e.to_string().red().bold());
         process::exit(1);
     }
+
 }

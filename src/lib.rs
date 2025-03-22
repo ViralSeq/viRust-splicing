@@ -10,16 +10,13 @@ pub mod splice_events;
 
 // pub mod splice_events;
 
-use crate::config::InputConfig;
+use crate::config::{InputConfig, SpliceConfig};
 
 
 pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let forward_n_size = 4; // consider moving to master config
     let umi_size = 14; // consider moving to master config
-
-    let query = config.query;
-    let distance = config.distance;
 
     let r1_file_path = &config.filename_r1;
     let r2_file_path = &config.filename_r2;
@@ -36,7 +33,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let records = records?;
 
-    let splice_config = config::SpliceConfig::build(query, distance)?;
+    let splice_config = SpliceConfig::build_from_input(config)?;
 
     let splice_events: Vec<_> = records.par_iter().map(|(r1_record, r2_record)| {
         let mut joined_umi_sequence = joined_umi_sequence::JoinedUmiSequnce::from_fasta_record(
@@ -47,7 +44,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
         joined_umi_sequence.join();
 
-        joined_umi_sequence.check_splice_event(&splice_config)
+        joined_umi_sequence.check_splice_event(&splice_config).unwrap() // not sure how to pass the error
 
     }).collect();
 
@@ -73,7 +70,7 @@ mod tests {
     #[test]
     fn test_pattern_search() {
         let pattern = b"TTTTCCTAGGATATGGCTCCATAACTTAGGACAA";
-        let nl43_file = "tests/nl43.fasta";
+        let nl43_file = "data/nl43.fasta";
         let fasta_reader = open_fasta_file(nl43_file).unwrap();
         let record = fasta_reader.records().next().unwrap().unwrap();
         let sequence = record.seq().to_vec();

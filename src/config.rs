@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::process;
+use tap::Pipe;
+use crate::open_fasta_file;
 
 #[derive(Debug)]
 pub struct InputConfig {
@@ -10,11 +12,13 @@ pub struct InputConfig {
     pub distance: u8,
     pub filename_r1: String,
     pub filename_r2: String,
+    pub assay_type: SpliceAssayType,
 }
 
 #[derive(Debug)]
 pub struct SpliceConfig {
     pub strain: String,
+    pub splice_assay_type: SpliceAssayType,
     pub distance: u8,
     pub query_list: HashMap<String, String>,
     pub d1: String,
@@ -26,7 +30,13 @@ pub struct SpliceConfig {
     pub d2_to_all: Vec<SpliceStep>,
     pub d2b_to_all: Vec<SpliceStep>,
     pub d3_to_all: Vec<SpliceStep>,
+    pub full_length_sequence: String,
+    pub d4_breakpoint_position: usize,
+    pub a7_breakpoint_position: usize,
 }
+
+pub const SPICE_FORM_CONFIG: &str = "data/splice_form_config.toml";
+
 
 #[derive(Debug)]
 pub struct SpliceStep {
@@ -35,12 +45,18 @@ pub struct SpliceStep {
     pub pattern: String,
 }
 
+#[derive(Debug,PartialEq)]
+pub enum SpliceAssayType {
+    RandomReverse,
+    KMer,
+    SizeSpecific
+}
 
 impl InputConfig {
     pub fn build() -> Result<InputConfig, Box<dyn Error>> {
         let args: Vec<String> = env::args().collect();
-        if args.len() != 5 {
-            return Err("Wrong number of Arguments\n Usage: cargo run <query_tag> <distance> <r1_file_path> <r1_file_path>".into());
+        if args.len() != 6 {
+            return Err("Wrong number of Arguments\n Usage: cargo run <query_tag> <distance> <assay> <r1_file_path> <r1_file_path>".into());
         }
 
         let query = args[1].clone();
@@ -54,12 +70,22 @@ impl InputConfig {
             }
         };
 
-        let filename_r1 = args[3].clone();
-        let filename_r2 = args[4].clone();
+        let assay_type = match args[3].as_str() {
+            "random_reverse" => SpliceAssayType::RandomReverse,
+            "kmer" => SpliceAssayType::KMer,
+            "size_specific" => SpliceAssayType::SizeSpecific,
+            _ => {
+                return Err("Assay type must be random_reverse, kmer or size_specific".into());
+            }
+        };
+
+        let filename_r1 = args[4].clone();
+        let filename_r2 = args[5].clone();
 
         Ok(InputConfig {
             query,
             distance,
+            assay_type,
             filename_r1,
             filename_r2,
         })
@@ -67,9 +93,10 @@ impl InputConfig {
 }
 
 impl SpliceConfig {
-    pub fn build(strain: String, distance: u8) -> Result<SpliceConfig, Box<dyn Error>> {
+    pub fn build(strain: String, distance: u8, splice_assay_type: SpliceAssayType) -> Result<SpliceConfig, Box<dyn Error>> {
+
         let splice_form_config: HashMap<String, HashMap<String, String>> = Config::builder()
-            .add_source(config::File::with_name("data/splice_form_config.toml"))
+            .add_source(config::File::with_name(SPICE_FORM_CONFIG))
             .build()?
             .try_deserialize::<HashMap<String, HashMap<String, String>>>()?;
 
@@ -139,20 +166,46 @@ impl SpliceConfig {
 
         let seventh_step = SpliceStep::build("D3", d3_unspliced_a3_a7, &query_list);
 
-        Ok(SpliceConfig {
-            strain,
-            distance,
-            query_list,
-            d1,
-            d2,
-            d2b,
-            d2b_unspliced,
-            d3,
-            d1_to_all: second_step,
-            d2_to_all: fourth_step,
-            d2b_to_all: fifth_step,
-            d3_to_all: seventh_step,
-        })
+        let strain_file_name = format!("data/{}.fasta", strain.to_lowercase());
+
+        let fasta_reader = open_fasta_file(&strain_file_name)?;
+
+
+        if let Some(record)= fasta_reader.records().next() {
+            let record = record?;
+            let full_length_sequence = record.seq().to_vec().pipe(String::from_utf8).unwrap();
+            let d4_breakpoint_position = query_list.get("D4_breakpoint_position").unwrap().parse::<usize>().unwrap();
+            let a7_breakpoint_position = query_list.get("A7_breakpoint_position").unwrap().parse::<usize>().unwrap();
+
+            Ok(SpliceConfig {
+                strain,
+                splice_assay_type,
+                distance,
+                query_list,
+                d1,
+                d2,
+                d2b,
+                d2b_unspliced,
+                d3,
+                d1_to_all: second_step,
+                d2_to_all: fourth_step,
+                d2b_to_all: fifth_step,
+                d3_to_all: seventh_step,
+                full_length_sequence,
+                d4_breakpoint_position,
+                a7_breakpoint_position,
+            })
+        } else {
+           Err("No record found in fasta file".into())
+        }
+    }
+
+    pub fn build_from_input(input_config: InputConfig) -> Result<SpliceConfig, Box<dyn Error>> {
+        let strain = input_config.query;
+        let distance = input_config.distance;
+        let splice_assay_type = input_config.assay_type;
+        let splice_config = SpliceConfig::build(strain, distance, splice_assay_type)?;
+        Ok(splice_config)
     }
 }
 
@@ -178,6 +231,7 @@ impl SpliceStep {
     }
 }
 
+
 #[cfg(test)]
 
 mod tests {
@@ -186,7 +240,7 @@ mod tests {
     fn test_splice_config() {
         let strain = "NL43".to_lowercase().to_string();
         let distance = 10;
-        let splice_config = SpliceConfig::build(strain, distance).unwrap();
+        let splice_config = SpliceConfig::build(strain, distance, SpliceAssayType::RandomReverse).unwrap();
         assert_eq!(splice_config.strain, "nl43");
         assert_eq!(splice_config.distance, 10);
         assert_eq!(splice_config.query_list.get("D1").unwrap(), "GGGGCGGCGACTG");
@@ -199,13 +253,15 @@ mod tests {
         assert_eq!(splice_config.d1_to_all[1].acceptor, "A1");
         assert_eq!(splice_config.d1_to_all[2].pattern, "GGGGCGGCGACTGAATCTGCTATAA");
         assert_eq!(splice_config.d1_to_all[2].donor, "D1");
-        assert_eq!(splice_config.d1_to_all[2].acceptor, "A2");   
+        assert_eq!(splice_config.d1_to_all[2].acceptor, "A2");
         assert_eq!(splice_config.d2_to_all[0].pattern, "AG");
         assert_eq!(splice_config.d2_to_all[0].donor, "D2");
         assert_eq!(splice_config.d2_to_all[0].acceptor, "D2-unspliced");
         assert_eq!(splice_config.d2_to_all[1].pattern, "AAATCTGCTATAA");
         assert_eq!(splice_config.d2_to_all[1].donor, "D2");
         assert_eq!(splice_config.d2_to_all[1].acceptor, "A2");
+        assert_eq!(splice_config.d4_breakpoint_position, 4000);
+        assert_eq!(splice_config.a7_breakpoint_position, 7000);
     }
 
     #[test]

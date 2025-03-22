@@ -4,7 +4,6 @@ use virust_splicing::joined_umi_sequence::pattern_search;
 use tap::Pipe;
 use bio::io::fasta;
 use std::error::Error;
-use std::time::Duration;
 use rayon::prelude::*;
 use virust_splicing::joined_umi_sequence::JoinedUmiSequnce;
 
@@ -16,7 +15,7 @@ const SEQUENCE :&[u8] = b"CTATTGTGTGCATCAAAGGATAGATGTAAAAGACACCAAGGAAGCCTTAGATAA
 
 
 fn bench_fasta_reader() {
-    let nl43_file = "tests/nl43.fasta";
+    let nl43_file = "data/nl43.fasta";
     let fasta_reader = open_fasta_file(nl43_file).unwrap();
     let record = fasta_reader.records().next().unwrap().unwrap();
     record.seq().to_vec().pipe(String::from_utf8).unwrap();
@@ -131,7 +130,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("End Join", |b| b.iter(|| bench_end_join()));
 
     let mut group = c.benchmark_group("expensive reading");
-    group.measurement_time(Duration::from_secs(20));
+    group.sample_size(10);
     group.bench_function("Rayon", |b| b.iter(|| run_rayon().unwrap()));
     group.bench_function("Sequential", |b| b.iter(|| run().unwrap()));
     group.bench_function("Chunked", |b| b.iter(|| run_chunk().unwrap()));
