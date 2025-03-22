@@ -1,3 +1,15 @@
+//! # joined_umi_sequence.rs
+//!
+//! This module provides utilities for parsing, joining, and analyzing paired-end FASTA reads with Unique Molecular Identifiers (UMIs)
+//! in the context of HIV splicing analysis. It includes functionality to:
+//! - Extract metadata and sequences from forward and reverse reads.
+//! - Merge paired-end reads with configurable overlap detection.
+//! - Represent joined reads and convert them into FASTA records.
+//! - Detect splicing events through recursive search guided by a splicing configuration.
+//!
+//! The core structure in this module is `JoinedUmiSequence`, which stores parsed read data and facilitates downstream
+//! processing and splice event detection.
+
 use bio::io::fasta;
 use tap::Pipe;
 use bio::alphabets::dna;

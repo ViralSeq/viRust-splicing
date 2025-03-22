@@ -1,3 +1,18 @@
+//! # config.rs
+//! 
+//! This module defines the configuration structures and logic for parsing input parameters
+//! and building splice analysis configurations for HIV splicing assays.
+//! It includes:
+//! - `InputConfig`: Parses command-line arguments.
+//! - `SpliceConfig`: Constructs a full splicing configuration from a config file and fasta data.
+//! - `SpliceStep`: Represents a splice step pattern between donor and acceptor sites.
+//! - `SpliceAssayType`: Enumerates types of splice assays.
+//! 
+//! The configuration is based on a strain-specific query list loaded from a TOML file,
+//! and includes logic to build all relevant splicing steps for downstream analysis.
+//! 
+//! This module also includes test cases to verify correct behavior of configuration logic.
+
 use config::Config;
 use std::collections::HashMap;
 use std::env;
@@ -6,6 +21,8 @@ use std::process;
 use tap::Pipe;
 use crate::open_fasta_file;
 
+///
+/// Configuration parsed from CLI input arguments for initiating the splicing pipeline.
 #[derive(Debug)]
 pub struct InputConfig {
     pub query: String,
@@ -15,6 +32,9 @@ pub struct InputConfig {
     pub assay_type: SpliceAssayType,
 }
 
+///
+/// Full configuration for HIV splicing analysis, derived from input strain, query data,
+/// and the reference genome FASTA file.
 #[derive(Debug)]
 pub struct SpliceConfig {
     pub strain: String,
@@ -35,9 +55,12 @@ pub struct SpliceConfig {
     pub a7_breakpoint_position: usize,
 }
 
+///
+/// Path to the TOML configuration file specifying splice form definitions.
 pub const SPICE_FORM_CONFIG: &str = "data/splice_form_config.toml";
 
-
+///
+/// Represents a splicing step with donor, acceptor, and the combined sequence pattern.
 #[derive(Debug)]
 pub struct SpliceStep {
     pub donor: String,
@@ -45,6 +68,8 @@ pub struct SpliceStep {
     pub pattern: String,
 }
 
+///
+/// Enum for the type of assay used in splicing analysis.
 #[derive(Debug,PartialEq)]
 pub enum SpliceAssayType {
     RandomReverse,
@@ -53,6 +78,11 @@ pub enum SpliceAssayType {
 }
 
 impl InputConfig {
+    ///
+    /// Parses command-line arguments into an `InputConfig` structure.
+    /// 
+    /// # Errors
+    /// Returns an error if the arguments are malformed or invalid.
     pub fn build() -> Result<InputConfig, Box<dyn Error>> {
         let args: Vec<String> = env::args().collect();
         if args.len() != 6 {
@@ -93,6 +123,14 @@ impl InputConfig {
 }
 
 impl SpliceConfig {
+    ///
+    /// Builds a `SpliceConfig` from a given strain, distance, and assay type.
+    /// 
+    /// This function loads the splice form config and reference FASTA file,
+    /// and prepares splicing steps accordingly.
+    /// 
+    /// # Errors
+    /// Returns an error if the config or FASTA file cannot be read.
     pub fn build(strain: String, distance: u8, splice_assay_type: SpliceAssayType) -> Result<SpliceConfig, Box<dyn Error>> {
 
         let splice_form_config: HashMap<String, HashMap<String, String>> = Config::builder()
@@ -170,7 +208,6 @@ impl SpliceConfig {
 
         let fasta_reader = open_fasta_file(&strain_file_name)?;
 
-
         if let Some(record)= fasta_reader.records().next() {
             let record = record?;
             let full_length_sequence = record.seq().to_vec().pipe(String::from_utf8).unwrap();
@@ -200,6 +237,8 @@ impl SpliceConfig {
         }
     }
 
+    ///
+    /// Convenience method to build `SpliceConfig` from an `InputConfig`.
     pub fn build_from_input(input_config: InputConfig) -> Result<SpliceConfig, Box<dyn Error>> {
         let strain = input_config.query;
         let distance = input_config.distance;
@@ -209,9 +248,17 @@ impl SpliceConfig {
     }
 }
 
-
-
 impl SpliceStep {
+    ///
+    /// Constructs a list of `SpliceStep` entries from a donor and multiple acceptors.
+    /// 
+    /// # Arguments
+    /// * `donor` - The donor splice site key.
+    /// * `acceptor_list` - A list of acceptor splice site keys.
+    /// * `query_list` - A map from splice site keys to sequence strings.
+    ///
+    /// # Returns
+    /// A vector of `SpliceStep` structs, each containing a donor-acceptor pattern.
     pub fn build(
         donor: &str,
         acceptor_list: Vec<&str>,
@@ -231,9 +278,7 @@ impl SpliceStep {
     }
 }
 
-
 #[cfg(test)]
-
 mod tests {
     use super::*;
     #[test]
@@ -265,7 +310,6 @@ mod tests {
     }
 
     #[test]
-
     fn test_build_splice_step() {
         let list = vec!["A1", "A2", "A3"];
         let mut query_list = HashMap::new();
@@ -284,6 +328,4 @@ mod tests {
         assert_eq!(splice_steps[2].donor, "D1".to_string());
         assert_eq!(splice_steps[2].acceptor, "A3".to_string());
     }
-
-
 }
