@@ -1443,6 +1443,7 @@ dependencies = [
  "colored",
  "config",
  "criterion",
+ "itertools 0.14.0",
  "rayon",
  "serde",
  "serde_json",

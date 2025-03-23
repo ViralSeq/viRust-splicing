@@ -7,6 +7,7 @@ use rayon::prelude::*;
 pub mod config;
 pub mod joined_umi_sequence;
 pub mod splice_events;
+pub mod umi;
 
 // pub mod splice_events;
 
@@ -48,10 +49,10 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     }).collect();
 
-
-    for splice_event in splice_events {
+    splice_events.iter().for_each(|splice_event| {
         println!("{:?}", splice_event);
-    }
+    });
+
 
     Ok(())
 }

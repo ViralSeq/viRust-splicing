@@ -305,8 +305,8 @@ mod tests {
         assert_eq!(splice_config.d2_to_all[1].pattern, "AAATCTGCTATAA");
         assert_eq!(splice_config.d2_to_all[1].donor, "D2");
         assert_eq!(splice_config.d2_to_all[1].acceptor, "A2");
-        assert_eq!(splice_config.d4_breakpoint_position, 4000);
-        assert_eq!(splice_config.a7_breakpoint_position, 7000);
+        assert_eq!(splice_config.d4_breakpoint_position, 5301);
+        assert_eq!(splice_config.a7_breakpoint_position, 7625);
     }
 
     #[test]
