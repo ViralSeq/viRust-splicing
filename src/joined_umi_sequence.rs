@@ -128,10 +128,13 @@ impl JoinedUmiSequnce {
         let mut event = SpliceEvents::from_joined_umi_with_event(self, chain);
         event.add_post_splice_sequence(String::from_utf8(final_seq.to_vec())?);
         event.find_size_class(splice_config)?;
+        event.predict_final_category();
         Ok(event)
     }
 
 }
+
+
 
 /// Processes splicing steps recursively based on the stage.
 ///

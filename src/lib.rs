@@ -2,7 +2,9 @@ use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use bio::io::fasta;
+use std::io::Write;
 use rayon::prelude::*;
+use splice_events::find_umi_family_from_events;
 
 pub mod config;
 pub mod joined_umi_sequence;
@@ -13,7 +15,7 @@ pub mod umi;
 
 use crate::config::{InputConfig, SpliceConfig};
 
-
+// TODO: modify error handling
 pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let forward_n_size = 4; // consider moving to master config
@@ -49,9 +51,14 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     }).collect();
 
-    splice_events.iter().for_each(|splice_event| {
-        println!("{:?}", splice_event);
-    });
+    // TODO: efficiency test needed
+    let splice_events_with_umi_family = find_umi_family_from_events(splice_events);
+
+    let mut file = File::create("output.tsv")?;
+    writeln!(file,"sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category")?;
+    for res in splice_events_with_umi_family.iter() {
+        writeln!(file, "{}", res.to_string())?;
+    }
 
 
     Ok(())

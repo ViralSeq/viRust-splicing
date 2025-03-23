@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
-use crate::config::SpliceConfig;
+use std::collections::HashMap;
 use std::error::Error;
-use crate::joined_umi_sequence::JoinedUmiSequnce;
-use crate::joined_umi_sequence::pattern_search;
-use crate::config::SpliceAssayType;
+use std::fmt::{self, Display, Formatter};
+
+use crate::config::{SpliceConfig, SpliceAssayType};
+use crate::joined_umi_sequence::{JoinedUmiSequnce, pattern_search};
+use crate::umi::find_umi_family;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SpliceEvents {
@@ -14,6 +16,7 @@ pub struct SpliceEvents {
     pub umi_family: Option<String>,
     pub splice_category: SpliceChain,
     pub size_class: Option<SizeClass>,
+    pub final_category: Option<String>,
 
 }
 
@@ -38,6 +41,7 @@ impl SpliceEvents {
         let search_sequence = joined_umi.find_sequence_for_search().clone();
         let post_splice_sequence = None;
         let size_class = None;
+        let final_category = None;
 
         SpliceEvents {
             sequence_id,
@@ -47,6 +51,7 @@ impl SpliceEvents {
             umi_family,
             splice_category,
             size_class,
+            final_category,
         }
     }
 
@@ -144,7 +149,45 @@ impl SpliceEvents {
         Ok(())
     }
 
+    pub fn predict_final_category(&mut self) {
+        let mut key_event = self.splice_category.splice_event.join("_");
+        let key_class =  match self.size_class.as_ref() {
+            Some(class) => class.to_string(),
+            None => "Unknown".to_string(),
+        };
+        key_event = key_event + "_" + &key_class;
+        self.final_category = Some(key_event);
+    }
 
+}
+
+
+/// Implements the `Display` trait for the `SpliceEvents` struct, allowing it to be
+/// formatted as a string. The output is a tab-separated string containing the following fields:
+/// 
+/// - `sequence_id`: The identifier for the sequence.
+/// - `umi`: The unique molecular identifier.
+/// - `umi_family`: The UMI family, or "None" if not present.
+/// - `splice_category.splice_event`: A joined string of splice events separated by underscores.
+/// - `size_class`: The size class, or "Unknown" if not specified.
+/// - `final_category`: The final category, or "Unknown" if not specified.
+/// 
+/// This implementation ensures that `SpliceEvents` can be easily converted to a human-readable
+/// string representation for logging or debugging purposes.
+impl Display for SpliceEvents {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f, 
+            "{}\t{}\t{}\t{}\t{}\t{}", 
+            self.sequence_id, 
+            self.umi,
+            self.umi_family.as_deref().unwrap_or("None"),
+            self.splice_category.splice_event.join("_"),
+            self.size_class.as_ref().unwrap_or(&SizeClass::Unknown).to_string(),
+            self.final_category.as_deref().unwrap_or("Unknown")
+                
+        )
+    }
 }
 
 impl SpliceChain {
@@ -158,13 +201,52 @@ impl SpliceChain {
     }
 }
 
+impl Display for SizeClass {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            SizeClass::OnePointEightKb => write!(f, "1.8kb"),
+            SizeClass::FourKb => write!(f, "4kb"),
+            SizeClass::BothClass => write!(f, "Both"),
+            SizeClass::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
 
-// TODO: Work on this tomorrow. 
-pub fn find_umi_family_from_events(mut events: Vec<SpliceEvents>) -> Vec<SpliceEvents> {
-    let mut outcome_events: Vec<SpliceEvents> = Vec::new();
+// TODO: This function uses multiple HashMaps and Vecs to store the data. It is not very efficient. Consider optimizing it.
+pub fn find_umi_family_from_events(events: Vec<SpliceEvents>) -> Vec<SpliceEvents> {
+    let events_by_final_category = group_by_final_category(events);
+    let mut outcome_events = Vec::new();
+
+    for events in events_by_final_category.values() {
+        let umis: Vec<&str> = events.iter().map(|event| event.umi.as_str()).collect();
+        let families = find_umi_family(umis);
+
+        outcome_events.extend(events.iter().map(|event| {
+            let mut new_event = event.clone();
+            new_event.umi_family = families.iter().find(|&&x| x == event.umi).map(|_| event.umi.clone());
+            new_event
+        }));
+    }
 
     outcome_events
 }
+
+fn group_by_final_category(events: Vec<SpliceEvents>) -> HashMap<String, Vec<SpliceEvents>> {
+    let mut category_map: HashMap<String, Vec<SpliceEvents>> = HashMap::new();
+
+    for event in events.iter() {
+        let category = event.final_category.as_ref().unwrap();
+        if category_map.contains_key(category) {
+            category_map.get_mut(category).unwrap().push(event.clone());
+        } else {
+            category_map.insert(category.clone(), vec![event.clone()]);
+        }
+    }
+
+    category_map
+}
+
+
 
 fn slice_from_end(input: &str, chunk_size: u8, offset: u8, min_length: u8) -> Vec<String> {
 
@@ -184,6 +266,9 @@ mod tests {
     use super::*;
     use crate::open_fasta_file;
     use tap::Pipe;
+    use itertools::Itertools;
+    // use std::fs::File;
+    // use std::io::Write;
 
     #[test]
     fn test_slice_from_end() {
@@ -220,6 +305,7 @@ mod tests {
                 splice_event: vec!["test".to_string()],
             },
             size_class: None,
+            final_category: None,
         };
 
         let config = SpliceConfig::build("nl43".to_string(), 2, SpliceAssayType::SizeSpecific).unwrap();
@@ -283,5 +369,111 @@ mod tests {
         assert_eq!(splice_event6.size_class, Some(SizeClass::OnePointEightKb));
 
 
+    }
+
+    #[test]
+    fn test_display_size_class() {
+        assert_eq!(SizeClass::OnePointEightKb.to_string(), "1.8kb");
+        assert_eq!(SizeClass::FourKb.to_string(), "4kb");
+        assert_eq!(SizeClass::BothClass.to_string(), "Both");
+        assert_eq!(SizeClass::Unknown.to_string(), "Unknown");
+    }
+
+    #[test]
+    fn test_display_splice_events() {
+        let mut splice_event = SpliceEvents {
+            sequence_id: "test".to_string(),
+            search_sequence: "TTTTCCTAGGATATGGCTCCATAACTTAGGACAA".to_string(),
+            post_splice_sequence: None,
+            umi: "TTTTCCTAGGATATGGCTCCATAACTTAGGACAA".to_string(),
+            umi_family: None,
+            splice_category: SpliceChain {
+                splice_event: vec!["D1".to_string(), "A1".to_string(), "D2".to_string(), "A2".to_string(), "D3".to_string(), "A3".to_string(),],
+            },
+            size_class: Some(SizeClass::FourKb),
+            final_category: None,
+        };
+        splice_event.predict_final_category();
+
+        assert_eq!(splice_event.to_string(), "test\tTTTTCCTAGGATATGGCTCCATAACTTAGGACAA\tNone\tD1_A1_D2_A2_D3_A3\t4kb\tD1_A1_D2_A2_D3_A3_4kb");
+    }
+
+    #[test]
+
+    fn test_find_umi_family_from_events() {
+        let mut events: Vec<SpliceEvents> = Vec::new();
+        let mut events_template_1 = SpliceEvents {
+            sequence_id: "test".to_string(),
+            search_sequence: "TTTTCCTAGGATATGGCTCCATAACTTAGGACAA".to_string(),
+            post_splice_sequence: None,
+            umi: "AAAAA".to_string(),
+            umi_family: None,
+            splice_category: SpliceChain {
+                splice_event: vec!["D1".to_string(), "A1".to_string(), "D2".to_string(), "A2".to_string(), "D3".to_string(), "A3".to_string(),],
+            },
+            size_class: Some(SizeClass::FourKb),
+            final_category: Some("D1_A1_D2_A2_D3_A3_4kb".to_string()),
+        };
+        let mut events_template_2 = SpliceEvents {
+            sequence_id: "test".to_string(),
+            search_sequence: "TTTTCCTAGGATATGGCTCCATAACTTAGGACAA".to_string(),
+            post_splice_sequence: None,
+            umi: "AAAAA".to_string(),
+            umi_family: Some("AAAAA".to_string()),
+            splice_category: SpliceChain {
+                splice_event: vec!["D1".to_string(),  "A2".to_string(), "D3".to_string(), "A7".to_string(),],
+            },
+            size_class: Some(SizeClass::OnePointEightKb),
+            final_category: Some("D1_A2_D3_A7_1.8kb".to_string()),
+        };
+
+        for _ in 0..1000 {
+            events.push(events_template_1.clone());
+            events.push(events_template_2.clone());
+        }
+
+        events_template_1.umi = "TTTTT".to_string();
+        events_template_2.umi = "TTTTT".to_string();
+        for _ in 0..50 {
+            events.push(events_template_1.clone());
+            events.push(events_template_2.clone()); 
+        }
+
+        events_template_1.umi = "CCCCC".to_string();
+        events_template_2.umi = "CCCCC".to_string();
+        for _ in 0..5 {
+            events.push(events_template_1.clone());
+            events.push(events_template_2.clone()); 
+        }
+
+        events_template_1.umi = "GGGGG".to_string();
+        events_template_2.umi = "GGGGG".to_string();
+        for _ in 0..500 {
+            events.push(events_template_1.clone());
+            events.push(events_template_2.clone()); 
+        }
+
+        let result = find_umi_family_from_events(events.clone());
+
+        let family: Vec<String> = result.iter().map(|event| event.umi_family.as_ref().unwrap_or(&"None".to_string()).to_string()).collect();
+        let uniq_family: Vec<String> = family.into_iter().unique().collect();
+        
+        assert_eq!(uniq_family.len(), 4);
+        assert_eq!(uniq_family, vec!["AAAAA", "TTTTT",  "None","GGGGG",]);
+
+        let group = group_by_final_category(events);
+
+        let mut group_keys = group.keys().collect::<Vec<_>>();
+        group_keys.sort();
+        assert_eq!(group_keys, vec!["D1_A1_D2_A2_D3_A3_4kb", "D1_A2_D3_A7_1.8kb"]);
+
+        // TODO: was trying to write the lines to a file but run into warnings. test file write later. 
+        // let mut file = File::create("output.tsv").expect("Unable to create file");
+        // writeln!(file,"sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category").expect("Unable to write to file");
+        // for res in result.iter() {
+        //     writeln!(file, "{}", res.to_string()).expect("Unable to write to file");
+        // }
+
+        assert_eq!(result.len(), 3110);
     }
 }

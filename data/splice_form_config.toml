@@ -1,11 +1,15 @@
 # for strain nl43
 
+nl43.D4_breakpoint_position = 5301 # first base after D4, position starts with 0, 5301..5303: "GTA", HXB2 position 6045 (starts with 1)
+nl43.A7_breakpoint_position = 7625 # first base after A7, position starts with 0, 7624..7626: "ACC", HXB2 position 8379 (starts with 1)
+
+
 nl43.D1 = "GGGGCGGCGACTG"
 nl43.D1-unspliced = "GTGAGTACGCCAAAAA"
 nl43.A1 = "GGACAGCAGAGA"
 nl43.A2 = "AATCTGCTATAA"
 
-# work on later
+# //TODO: check if the following sequences are correct
 
 nl43.D2 = "A"
 nl43.D2-unspliced = "G"
@@ -23,8 +27,6 @@ nl43.A5a = "C"
 nl43.A5b = "C"
 nl43.A7 = "C"
 
-nl43.D4_breakpoint_position = 5301 # first base after D4, position starts with 0, 5301..5303: "GTA", HXB2 position 6045 (starts with 1)
-nl43.A7_breakpoint_position = 7625 # first base after A7, position starts with 0, 7624..7626: "ACC", HXB2 position 8379 (starts with 1)
 
 
 

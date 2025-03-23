@@ -68,9 +68,36 @@ mod tests {
         umis.extend(repeat("TTTTT").take(50));
         umis.extend(repeat("CCCCC").take(5));
         umis.extend(repeat("GGGGG").take(500));
-        let mut families = find_umi_family(umis);
+        let mut families = find_umi_family(umis.clone());
         families.sort();
         assert_eq!(families.len(), 3);
         assert_eq!(families, vec!["AAAAA", "GGGGG", "TTTTT"]);
+
+        let mut filtered_umis: Vec<Option<String>> = Vec::new();
+
+        filtered_umis.extend(
+            umis
+            .iter()
+            .map(
+                |x| {families.iter().find(|&y|x == y).map(|y|y.to_string())    
+                }
+            )
+        );
+
+        let n = filtered_umis.iter().filter(|umi| umi.is_some()).count();
+
+        assert_eq!(n, 1550);
+    }
+
+    #[test]
+    fn test_find_umi_family_2() {
+        let mut umis: Vec<&str> = Vec::new();
+        umis.extend(repeat("AAAAA").take(2));
+        umis.extend(repeat("TTTTT").take(2));
+        umis.extend(repeat("CCCCC").take(2));
+        umis.extend(repeat("GGGGG").take(2));
+        let mut families = find_umi_family(umis);
+        families.sort();
+        assert_eq!(families.len(), 0);
     }
 }
