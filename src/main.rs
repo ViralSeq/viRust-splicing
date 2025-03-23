@@ -3,6 +3,7 @@ use colored::Colorize;
 
 use virust_splicing::config::InputConfig;
 
+// TODO: Intergrated test needed. 
 fn main() {
     println!("{}", "ViRust-Splicing for processing HIV splicing data.\n Placeholder for more information.".cyan().bold());
     let config = InputConfig::build()

@@ -64,6 +64,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// TODO: Currently only fasta reader. Consider adding fastq reader. 
 pub fn open_fasta_file(file_path: &str) -> Result<fasta::Reader<BufReader<BufReader<File>>>, Box<dyn Error>> {
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);

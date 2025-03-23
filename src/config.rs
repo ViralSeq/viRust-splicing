@@ -80,6 +80,7 @@ pub enum SpliceAssayType {
 impl InputConfig {
     ///
     /// Parses command-line arguments into an `InputConfig` structure.
+    /// TODO: Add more detailed argument parsing and validation. Consider using a library like `clap`.
     /// 
     /// # Errors
     /// Returns an error if the arguments are malformed or invalid.
