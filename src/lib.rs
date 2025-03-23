@@ -18,8 +18,8 @@ use crate::config::{InputConfig, SpliceConfig};
 // TODO: modify error handling
 pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
-    let forward_n_size = 4; // consider moving to master config
-    let umi_size = 14; // consider moving to master config
+    let forward_n_size = 4; // TODO consider moving to master config
+    let umi_size = 14; // TODO consider moving to master config
 
     let r1_file_path = &config.filename_r1;
     let r2_file_path = &config.filename_r2;

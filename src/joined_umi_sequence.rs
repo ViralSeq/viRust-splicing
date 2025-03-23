@@ -77,8 +77,8 @@ impl JoinedUmiSequnce {
     ///
     /// This method uses a minimum overlap and error rate to determine if the reads can be merged.
     pub fn join(&mut self) {
-        let min_overlap = 10; // Minimum overlap length required for merging. Consider moving to master config.
-        let error_rate = 0.02; // Maximum error rate allowed in the overlap region. Consider moving to master config.
+        let min_overlap = 10; // TODO Minimum overlap length required for merging. Consider moving to master config.
+        let error_rate = 0.02; // TODO Maximum error rate allowed in the overlap region. Consider moving to master config.
         if let Some(joined) = join_reads(&self.forward_sequence, &self.reverse_sequence, min_overlap, error_rate) {
             self.joined_sequence = Some(joined);
         }
