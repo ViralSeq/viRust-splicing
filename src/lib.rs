@@ -38,6 +38,8 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let splice_config = SpliceConfig::build_from_input(config)?;
 
+    // dbg!(&splice_config);
+
     let splice_events: Vec<_> = records.par_iter().map(|(r1_record, r2_record)| {
         let mut joined_umi_sequence = joined_umi_sequence::JoinedUmiSequnce::from_fasta_record(
             &r1_record,
@@ -50,6 +52,8 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
         joined_umi_sequence.check_splice_event(&splice_config).unwrap() // not sure how to pass the error
 
     }).collect();
+
+    // dbg!(println!("{:#?}", splice_events)); 
 
     // TODO: efficiency test needed
     let splice_events_with_umi_family = find_umi_family_from_events(splice_events);

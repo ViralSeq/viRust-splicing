@@ -113,7 +113,8 @@ impl SpliceEvents {
                 }
             }
             SpliceAssayType::RandomReverse => {
-                let slice_of_patterns = slice_from_end(post_splice_sequence, 15, 15, 10);
+                let slice_of_patterns = slice_from_end(post_splice_sequence, 20, 15, 10);
+                // dbg!(&slice_of_patterns);
                 if slice_of_patterns.is_empty() {
                     self.size_class = Some(SizeClass::Unknown);
                     return Ok(());
@@ -124,12 +125,16 @@ impl SpliceEvents {
 
                 for pattern in slice_of_patterns.iter() {
                     if let Some(aln) = pattern_search(config.full_length_sequence.as_bytes(), pattern.as_bytes(), config.distance) {
+                        // println!("{:?}", aln.ystart);
+                        // println!("{:?}", pattern);
                         if aln.ystart < config.a7_breakpoint_position && aln.ystart > config.d4_breakpoint_position {
                             self.size_class = Some(SizeClass::FourKb); // if we find a 4kb pattern (between D4 and A7), we can stop
                             return Ok(());
                         } else if aln.ystart > config.a7_breakpoint_position {
+                            // println!("found 1.8kb");
                             found_1_8k = true;
                         } else if aln.ystart < config.d4_breakpoint_position {
+                            // println!("found both");
                             found_both = true;
                         }
                     }
@@ -219,6 +224,7 @@ pub fn find_umi_family_from_events(events: Vec<SpliceEvents>) -> Vec<SpliceEvent
 
     for events in events_by_final_category.values() {
         let umis: Vec<&str> = events.iter().map(|event| event.umi.as_str()).collect();
+        
         let families = find_umi_family(umis);
 
         outcome_events.extend(events.iter().map(|event| {
@@ -245,8 +251,6 @@ fn group_by_final_category(events: Vec<SpliceEvents>) -> HashMap<String, Vec<Spl
 
     category_map
 }
-
-
 
 fn slice_from_end(input: &str, chunk_size: u8, offset: u8, min_length: u8) -> Vec<String> {
 

@@ -23,7 +23,7 @@ use crate::open_fasta_file;
 
 ///
 /// Configuration parsed from CLI input arguments for initiating the splicing pipeline.
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct InputConfig {
     pub query: String,
     pub distance: u8,
@@ -70,7 +70,7 @@ pub struct SpliceStep {
 
 ///
 /// Enum for the type of assay used in splicing analysis.
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq, Clone)]
 pub enum SpliceAssayType {
     RandomReverse,
     KMer,
@@ -78,6 +78,22 @@ pub enum SpliceAssayType {
 }
 
 impl InputConfig {
+
+    pub fn new(
+        query: String,
+        distance: u8,
+        assay_type: SpliceAssayType,
+        filename_r1: String,
+        filename_r2: String,
+    ) -> Self {
+        InputConfig {
+            query,
+            distance,
+            assay_type,
+            filename_r1,
+            filename_r2,
+        }
+    }
     ///
     /// Parses command-line arguments into an `InputConfig` structure.
     /// TODO: Add more detailed argument parsing and validation. Consider using a library like `clap`.
@@ -134,31 +150,21 @@ impl SpliceConfig {
     /// Returns an error if the config or FASTA file cannot be read.
     pub fn build(strain: String, distance: u8, splice_assay_type: SpliceAssayType) -> Result<SpliceConfig, Box<dyn Error>> {
 
-        let splice_form_config: HashMap<String, HashMap<String, String>> = Config::builder()
-            .add_source(config::File::with_name(SPICE_FORM_CONFIG))
-            .build()?
-            .try_deserialize::<HashMap<String, HashMap<String, String>>>()?;
-
-        let query_list = splice_form_config
-            .get(&strain)
-            .unwrap_or_else(|| {
-                eprintln!("Strain {} not found in config file", strain);
-                process::exit(1);
-            })
-            .clone();
+        let query_list = from_splice_form_file_to_hashmap(&strain)?;
 
         // first step check D1
         let d1 = query_list.get("D1").unwrap().clone();
 
         // this is the most common acceptor sites list
+        // there is an intrinsic order in the acceptor sites, so we need to keep the order
 
-        let mut common_acceptor_sites = vec!["A3", "A4a", "A4b", "A4c", "A4d", "A5a", "A5b", "A7"];
+        let common_acceptor_sites = vec!["A3", "A4d", "A4c",  "A4a", "A4b",  "A5a", "A5b", "A7"];
 
         // second step check D1-unspliced and all the A sites
 
         let mut second_step_acceptor_sites = vec!["D1-unspliced", "A1", "A2"];
 
-        second_step_acceptor_sites.append(&mut common_acceptor_sites);
+        second_step_acceptor_sites.append(&mut common_acceptor_sites.clone());
 
         let second_step = SpliceStep::build("D1", second_step_acceptor_sites, &query_list);
 
@@ -172,7 +178,7 @@ impl SpliceConfig {
 
         let mut fouth_step_acceptor_sites = vec!["D2-unspliced", "A2"];
 
-        fouth_step_acceptor_sites.append(&mut common_acceptor_sites);
+        fouth_step_acceptor_sites.append(&mut common_acceptor_sites.clone());
 
         let fourth_step = SpliceStep::build("D2", fouth_step_acceptor_sites, &query_list);
 
@@ -188,7 +194,7 @@ impl SpliceConfig {
 
         let mut fifth_step_acceptor_sites = vec!["D2b-unspliced", "A2"];
 
-        fifth_step_acceptor_sites.append(&mut common_acceptor_sites);
+        fifth_step_acceptor_sites.append(&mut common_acceptor_sites.clone());
 
         let fifth_step = SpliceStep::build("D2b", fifth_step_acceptor_sites, &query_list);
 
@@ -201,7 +207,7 @@ impl SpliceConfig {
 
         let mut d3_unspliced_a3_a7 = vec!["D3-unspliced"];
 
-        d3_unspliced_a3_a7.append(&mut common_acceptor_sites);
+        d3_unspliced_a3_a7.append(&mut common_acceptor_sites.clone());
 
         let seventh_step = SpliceStep::build("D3", d3_unspliced_a3_a7, &query_list);
 
@@ -249,6 +255,24 @@ impl SpliceConfig {
     }
 }
 
+
+pub fn from_splice_form_file_to_hashmap(strain: &str) -> Result<HashMap<String, String>, Box<dyn Error>> {
+    let splice_form_config: HashMap<String, HashMap<String, String>> = Config::builder()
+    .add_source(config::File::with_name(SPICE_FORM_CONFIG))
+    .build()?
+    .try_deserialize::<HashMap<String, HashMap<String, String>>>()?;
+
+    let query_list = splice_form_config
+        .get(strain)
+        .unwrap_or_else(|| {
+            eprintln!("Strain {} not found in config file", strain);
+            process::exit(1);
+        })
+        .clone();
+
+    Ok(query_list)
+}
+
 impl SpliceStep {
     ///
     /// Constructs a list of `SpliceStep` entries from a donor and multiple acceptors.
@@ -294,16 +318,16 @@ mod tests {
         assert_eq!(splice_config.d1_to_all[0].pattern, "GGGGCGGCGACTGGTGAGTACGCCAAAAA");
         assert_eq!(splice_config.d1_to_all[0].donor, "D1");
         assert_eq!(splice_config.d1_to_all[0].acceptor, "D1-unspliced");
-        assert_eq!(splice_config.d1_to_all[1].pattern, "GGGGCGGCGACTGGGACAGCAGAGA");
+        assert_eq!(splice_config.d1_to_all[1].pattern, "GGGGCGGCGACTGGGACAGCAGA");
         assert_eq!(splice_config.d1_to_all[1].donor, "D1");
         assert_eq!(splice_config.d1_to_all[1].acceptor, "A1");
-        assert_eq!(splice_config.d1_to_all[2].pattern, "GGGGCGGCGACTGAATCTGCTATAA");
+        assert_eq!(splice_config.d1_to_all[2].pattern, "GGGGCGGCGACTGAATCTGCTAT");
         assert_eq!(splice_config.d1_to_all[2].donor, "D1");
         assert_eq!(splice_config.d1_to_all[2].acceptor, "A2");
-        assert_eq!(splice_config.d2_to_all[0].pattern, "AG");
+        assert_eq!(splice_config.d2_to_all[0].pattern, "CTCTGGAAAGGTGAAGGGGC");
         assert_eq!(splice_config.d2_to_all[0].donor, "D2");
         assert_eq!(splice_config.d2_to_all[0].acceptor, "D2-unspliced");
-        assert_eq!(splice_config.d2_to_all[1].pattern, "AAATCTGCTATAA");
+        assert_eq!(splice_config.d2_to_all[1].pattern, "CTCTGGAAAGAATCTGCTAT");
         assert_eq!(splice_config.d2_to_all[1].donor, "D2");
         assert_eq!(splice_config.d2_to_all[1].acceptor, "A2");
         assert_eq!(splice_config.d4_breakpoint_position, 5301);

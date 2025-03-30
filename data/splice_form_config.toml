@@ -1,31 +1,29 @@
 # for strain nl43
 
-nl43.D4_breakpoint_position = 5301 # first base after D4, position starts with 0, 5301..5303: "GTA", HXB2 position 6045 (starts with 1)
-nl43.A7_breakpoint_position = 7625 # first base after A7, position starts with 0, 7624..7626: "ACC", HXB2 position 8379 (starts with 1)
+nl43.D4_breakpoint_position = 5301 # first base after D4, position starts with 0, 5301..=5303: "GTA", HXB2 position 6045 (starts with 1)
+nl43.A7_breakpoint_position = 7625 # first base after A7, position starts with 0, 7624..=7626: "ACC", HXB2 position 8379 (starts with 1)
 
 
-nl43.D1 = "GGGGCGGCGACTG"
-nl43.D1-unspliced = "GTGAGTACGCCAAAAA"
-nl43.A1 = "GGACAGCAGAGA"
-nl43.A2 = "AATCTGCTATAA"
+nl43.D1 = "GGGGCGGCGACTG" # HXB2 position 743, last base position
+nl43.D1-unspliced = "GTGAGTACGCCAAAAA" # HXB2 position 744, last base position
+nl43.A1 = "GGACAGCAGA" # HXB2 position 4913
+nl43.A2 = "AATCTGCTAT" # HXB2 position 5390
 
-# //TODO: check if the following sequences are correct
+nl43.D2 = "CTCTGGAAAG" # HXB2 position 4962
+nl43.D2-unspliced = "GTGAAGGGGC" # HXB2 position 4963
+nl43.D2b = "CAGATGGCAG" # HXB2 position 5058
+nl43.D2b-unspliced = "GTGATGATTG" # HXB2 position 5059
+nl43.D3 = "ACATAACAAG" # HXB2 position 5463
+nl43.D3-unspliced = "GTAGGATCTC" # HXB2 position 5464
 
-nl43.D2 = "A"
-nl43.D2-unspliced = "G"
-nl43.D2b = "A"
-nl43.D2b-unspliced = "G"
-nl43.D3 = "A"
-nl43.D3-unspliced = "G"
-
-nl43.A3 = "C"
-nl43.A4a = "C"
-nl43.A4b = "C"
-nl43.A4c = "C"
-nl43.A4d = "C"
-nl43.A5a = "C"
-nl43.A5b = "C"
-nl43.A7 = "C"
+nl43.A3 = "AATTGGGTGT" # HXB2 position 5777
+nl43.A4a = "CCTTAGGCAT"  # HXB2 position 5955
+nl43.A4b = "GCATCTCCTA"  # HXB2 position 5961
+nl43.A4c = "TTTGTTTCAT" # HXB2 position 5937
+nl43.A4d = "TGTTGCTTTC" # HXB2 position 5918
+nl43.A5a = "GAAGAAGCGG" # HXB2 position 5977
+nl43.A5b = "AAGCGGAGAC" # HXB2 position 5981
+nl43.A7 = "ACCCACCTCC" # HXB2 position 8379
 
 
 

@@ -108,7 +108,7 @@ impl JoinedUmiSequnce {
     pub fn find_sequence_for_search(&self) -> String {
         match &self.joined_sequence {
             Some(joined_sequence) => joined_sequence.to_string(),
-            None => self.forward_sequence.to_string() + &self.reverse_sequence,
+            None => self.forward_sequence.to_string() + &reverse_complement(&self.reverse_sequence),
         }
     }
 
@@ -128,6 +128,7 @@ impl JoinedUmiSequnce {
         let mut event = SpliceEvents::from_joined_umi_with_event(self, chain);
         event.add_post_splice_sequence(String::from_utf8(final_seq.to_vec())?);
         event.find_size_class(splice_config)?;
+        // println!("Splice events: {:?}", event.size_class);
         event.predict_final_category();
         Ok(event)
     }
@@ -174,9 +175,15 @@ fn process_splice_rec<'a>(
         },
         // Stage 2: Process the acceptor immediately after D1.
         2 => {
+            // println!("step 2");
+            // println!("chain: {:?}", chain);
+            // println!("seq: {:?}", seq.to_vec().pipe(String::from_utf8));
+            // println!("config.d1_to_all: {:?}", config.d1_to_all);
+            // println!("distance: {:?}", distance);
             if let Some((acc, new_seq)) =
                 pattern_search_trim_seq_batch(seq, &config.d1_to_all, distance)
             {
+
                 chain.add_splice_event(acc.clone());
                 match acc.as_str() {
                     "A1" => process_splice_rec(new_seq, chain, config, 3),
@@ -248,6 +255,10 @@ fn process_splice_rec<'a>(
         },
         // Stage 7: Process the acceptor downstream of D3.
         7 => {
+            // println!("step 7");
+            // println!("chain: {:?}", chain);
+            // println!("seq: {:?}", seq.to_vec().pipe(String::from_utf8));
+            // println!("config.d3_to_all: {:?}", config.d3_to_all);
             if let Some((acc, new_seq)) =
                 pattern_search_trim_seq_batch(seq, &config.d3_to_all, distance)
             {
@@ -269,7 +280,7 @@ fn process_splice_rec<'a>(
 ///
 /// # Returns
 /// A `String` containing the reverse complement of the input sequence.
-fn reverse_complement(seq: &str) -> String {
+pub fn reverse_complement(seq: &str) -> String {
     seq.chars()
         .rev()
         .map(|c| c as u8)
@@ -409,11 +420,13 @@ pub fn pattern_search_trim_seq<'a>(sequence: &'a [u8], pattern: &[u8], distance:
 pub fn pattern_search_trim_seq_batch<'a>(sequence: &'a [u8], list: &Vec<SpliceStep>, distance: u8) -> Option<(String, &'a [u8])> {
 
     for step in list {
+
         let pattern = step.pattern.as_bytes();
 
         if let Some(trimmed_sequence) = pattern_search_trim_seq(sequence, pattern, distance) {
-            let matched_acceptor = step.acceptor.clone();
-            Some((matched_acceptor, trimmed_sequence));
+            // println!("matched acceptor: {:?}", step.acceptor);
+            let matched_acceptor = step.acceptor.clone();   
+            return Some((matched_acceptor, trimmed_sequence))
         }
     }
     None
