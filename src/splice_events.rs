@@ -37,6 +37,8 @@
 /// # Notes
 /// - The `find_umi_family_from_events` function uses multiple `HashMap` and `Vec` structures, which may not be optimal.
 /// - Consider optimizing the implementation for better performance.
+/// 
+/// MARK: Imports
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
@@ -46,6 +48,8 @@ use crate::config::{SpliceConfig, SpliceAssayType};
 use crate::joined_umi_sequence::{JoinedUmiSequnce, pattern_search};
 use crate::umi::find_umi_family;
 
+
+/// MARK: SpliceEvents
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SpliceEvents {
     pub sequence_id: String,
@@ -59,6 +63,7 @@ pub struct SpliceEvents {
 
 }
 
+/// MARK: SpliceChain
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct SpliceChain {
     pub splice_event: Vec<String>,
@@ -72,6 +77,7 @@ pub enum SizeClass {
     Unknown,
 }
 
+/// MARK: Impl SpliceEvents
 impl SpliceEvents {
     pub fn from_joined_umi_with_event(joined_umi: &JoinedUmiSequnce, splice_category: SpliceChain) -> SpliceEvents {
         let sequence_id = joined_umi.sequence_id.clone();
@@ -98,6 +104,7 @@ impl SpliceEvents {
         self.post_splice_sequence = Some(sequence);
     }
 
+    /// MARK: find_size_class
     pub fn find_size_class(&mut self, config: &SpliceConfig) -> Result<(), Box<dyn Error>> {
         for event in self.splice_category.splice_event.iter() {
             if event == "A7" { // if we find an A7 event, we know it is 1.8kb, nef transcript
@@ -162,7 +169,7 @@ impl SpliceEvents {
                 let mut found_1_8k = false;
                 let mut found_both = false;
 
-                for pattern in slice_of_patterns.iter() {
+                for pattern in slice_of_patterns[..slice_of_patterns.len().min(10)].iter() { // at most 10 patterns will be used to reduce run time. 
                     if let Some(aln) = pattern_search(config.full_length_sequence.as_bytes(), pattern.as_bytes(), config.distance) {
                         // println!("{:?}", aln.ystart);
                         // println!("{:?}", pattern);
@@ -205,7 +212,7 @@ impl SpliceEvents {
 
 }
 
-
+/// MARK: Impl SizeClass
 /// Implements the `Display` trait for the `SpliceEvents` struct, allowing it to be
 /// formatted as a string. The output is a tab-separated string containing the following fields:
 /// 
@@ -256,6 +263,7 @@ impl Display for SizeClass {
     }
 }
 
+/// MARK: FIND UMI FAMILY
 // TODO: This function uses multiple HashMaps and Vecs to store the data. It is not very efficient. Consider optimizing it.
 pub fn find_umi_family_from_events(events: Vec<SpliceEvents>) -> Vec<SpliceEvents> {
     let events_by_final_category = group_by_final_category(events);
@@ -304,6 +312,8 @@ fn slice_from_end(input: &str, chunk_size: u8, offset: u8, min_length: u8) -> Ve
     chunks
 }
 
+
+/// MARK: Tests
 #[cfg(test)]
 mod tests {
     use super::*;
