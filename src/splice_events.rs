@@ -1,3 +1,42 @@
+/// The `SpliceEvents` struct represents a splicing event with associated metadata.
+/// 
+/// # Fields
+/// - `sequence_id` (`String`): The identifier for the sequence.
+/// - `search_sequence` (`String`): The sequence used for searching.
+/// - `post_splice_sequence` (`Option<String>`): The sequence after the last splicing site, used to check size class.
+/// - `umi` (`String`): The unique molecular identifier.
+/// - `umi_family` (`Option<String>`): The UMI family, if identified.
+/// - `splice_category` (`SpliceChain`): The category of splicing events.
+/// - `size_class` (`Option<SizeClass>`): The size class of the splicing event.
+/// - `final_category` (`Option<String>`): The final predicted category of the splicing event.
+///
+/// # Methods
+/// - `from_joined_umi_with_event`: Creates a `SpliceEvents` instance from a `JoinedUmiSequnce` and a `SpliceChain`.
+/// - `add_post_splice_sequence`: Adds a post-splice sequence to the event.
+/// - `find_size_class`: Determines the size class of the splicing event based on the configuration.
+/// - `predict_final_category`: Predicts the final category of the splicing event based on its size class and splice events.
+///
+/// The struct also implements the `Display` trait for easy string formatting.
+///
+/// # Associated Types
+/// - `SpliceChain`: Represents a chain of splicing events.
+/// - `SizeClass`: Enum representing the size class of the splicing event.
+///
+/// # Utility Functions
+/// - `find_umi_family_from_events`: Groups splicing events by their final category and assigns UMI families.
+/// - `group_by_final_category`: Groups splicing events into a `HashMap` by their final category.
+/// - `slice_from_end`: Extracts slices from the end of a string based on chunk size, offset, and minimum length.
+///
+/// # Testing
+/// The module includes unit tests for:
+/// - `slice_from_end`: Validates slicing logic.
+/// - `find_size_class`: Tests size class determination under various configurations.
+/// - `Display` implementations for `SizeClass` and `SpliceEvents`.
+/// - `find_umi_family_from_events`: Ensures correct grouping and UMI family assignment.
+///
+/// # Notes
+/// - The `find_umi_family_from_events` function uses multiple `HashMap` and `Vec` structures, which may not be optimal.
+/// - Consider optimizing the implementation for better performance.
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;

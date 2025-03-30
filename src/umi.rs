@@ -7,6 +7,15 @@ use std::error::Error;
 use rand_distr::Normal;
 use plotters::prelude::*;
 
+/// Finds UMI families based on their frequency in the input list.
+///
+/// # Arguments
+///
+/// * `umis` - A vector of UMI strings.
+///
+/// # Returns
+///
+/// A vector of UMI strings that belong to families based on a frequency cutoff.
 pub fn find_umi_family(mut umis: Vec<&str>) -> Vec<&str> {
     let mut families: Vec<&str> = Vec::new();
 
@@ -32,6 +41,16 @@ pub fn find_umi_family(mut umis: Vec<&str>) -> Vec<&str> {
     families
 }
 
+/// Generates a single UMI of the specified length using a random seed.
+///
+/// # Arguments
+///
+/// * `umi_length` - The length of the UMI to generate.
+/// * `seed` - A seed value for reproducible random generation.
+///
+/// # Returns
+///
+/// A string representing the generated UMI.
 pub fn generate_one_umi(
     umi_length: u32,
     seed:u64
@@ -51,7 +70,16 @@ pub fn generate_one_umi(
     umi
 }
 
-
+/// Generates a list of UMIs of the specified length.
+///
+/// # Arguments
+///
+/// * `umi_length` - The length of each UMI.
+/// * `num_umis` - The number of UMIs to generate.
+///
+/// # Returns
+///
+/// A vector of strings representing the generated UMIs.
 pub fn generate_umis(
     umi_length: u32,
     num_umis: u32
@@ -65,6 +93,19 @@ pub fn generate_umis(
     umis
 }
 
+/// Simulates the distribution of UMIs across sequences with optional mutations.
+///
+/// # Arguments
+///
+/// * `num_sequences` - The number of sequences to simulate.
+/// * `umi_length` - The length of each UMI.
+/// * `umi_number` - The number of unique UMIs to generate.
+/// * `seed` - A seed value for reproducible random generation.
+/// * `mutation_rate` - The probability of mutating each base in a UMI.
+///
+/// # Returns
+///
+/// A `HashMap` where keys are UMIs and values are their frequencies, or an error if validation fails.
 pub fn simulate_umi_distribution(
     num_sequences: u32,
     umi_length: u32,
@@ -106,6 +147,16 @@ pub fn simulate_umi_distribution(
     Ok(umi_distribution)
 }
 
+/// Introduces mutations to a UMI based on a specified mutation rate.
+///
+/// # Arguments
+///
+/// * `umi` - The original UMI string.
+/// * `mutation_rate` - The probability of mutating each base in the UMI.
+///
+/// # Returns
+///
+/// A string representing the mutated UMI.
 pub fn mutate_umi(
     umi: &str,
     mutation_rate: f64,
@@ -131,7 +182,16 @@ pub fn mutate_umi(
     mutated_umi
 }
 
-// This function validates the number of unique UMIs can be requested based on the length
+/// Validates whether the requested number of UMIs can be generated for a given length.
+///
+/// # Arguments
+///
+/// * `num_umis` - The number of UMIs to validate.
+/// * `umi_length` - The length of each UMI.
+///
+/// # Returns
+///
+/// `true` if the number of UMIs is valid, `false` otherwise.
 pub fn validate_umis_by_length(
     num_umis: u32,
     umi_length: u32,
@@ -146,6 +206,16 @@ pub fn validate_umis_by_length(
     }
 }
 
+/// Plots the distribution of UMIs as a histogram and saves it to a file.
+///
+/// # Arguments
+///
+/// * `umi_distribution` - A `HashMap` where keys are UMIs and values are their frequencies.
+/// * `path` - The file path to save the histogram image.
+///
+/// # Returns
+///
+/// An empty result if successful, or an error if plotting fails.
 pub fn plot_umi_distribution(
     umi_distribution: &HashMap<String, u32>,
     path: &str
@@ -210,6 +280,15 @@ pub fn plot_umi_distribution(
 
 }
 
+/// Calculates the cutoff frequency for UMI families based on the maximum frequency.
+///
+/// # Arguments
+///
+/// * `m` - The maximum frequency of UMIs.
+///
+/// # Returns
+///
+/// An integer representing the cutoff frequency.
 fn umi_cut_off(m: usize) -> i32 {
     let n :f64;
     if m <= 10 {
