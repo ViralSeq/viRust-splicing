@@ -1,0 +1,9 @@
+name: virust
+services:
+  virust:
+    image: rust:1.85.0
+    command: sleep infinity
+    working_dir: /app
+    container_name: virust
+    volumes:
+      - ".:/app"
