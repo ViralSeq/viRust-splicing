@@ -1,5 +1,5 @@
 /// The `SpliceEvents` struct represents a splicing event with associated metadata.
-/// 
+///
 /// # Fields
 /// - `sequence_id` (`String`): The identifier for the sequence.
 /// - `search_sequence` (`String`): The sequence used for searching.
@@ -37,17 +37,16 @@
 /// # Notes
 /// - The `find_umi_family_from_events` function uses multiple `HashMap` and `Vec` structures, which may not be optimal.
 /// - Consider optimizing the implementation for better performance.
-/// 
+///
 /// MARK: Imports
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use crate::config::{SpliceConfig, SpliceAssayType};
+use crate::config::{SpliceAssayType, SpliceConfig};
 use crate::joined_umi_sequence::{JoinedUmiSequnce, pattern_search};
 use crate::umi::find_umi_family;
-
 
 /// MARK: SpliceEvents
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -60,7 +59,6 @@ pub struct SpliceEvents {
     pub splice_category: SpliceChain,
     pub size_class: Option<SizeClass>,
     pub final_category: Option<String>,
-
 }
 
 /// MARK: SpliceChain
@@ -79,7 +77,10 @@ pub enum SizeClass {
 
 /// MARK: Impl SpliceEvents
 impl SpliceEvents {
-    pub fn from_joined_umi_with_event(joined_umi: &JoinedUmiSequnce, splice_category: SpliceChain) -> SpliceEvents {
+    pub fn from_joined_umi_with_event(
+        joined_umi: &JoinedUmiSequnce,
+        splice_category: SpliceChain,
+    ) -> SpliceEvents {
         let sequence_id = joined_umi.sequence_id.clone();
         let umi = joined_umi.umi.clone();
         let umi_family = None;
@@ -107,14 +108,15 @@ impl SpliceEvents {
     /// MARK: find_size_class
     pub fn find_size_class(&mut self, config: &SpliceConfig) -> Result<(), Box<dyn Error>> {
         for event in self.splice_category.splice_event.iter() {
-            if event == "A7" { // if we find an A7 event, we know it is 1.8kb, nef transcript
+            if event == "A7" {
+                // if we find an A7 event, we know it is 1.8kb, nef transcript
                 self.size_class = Some(SizeClass::OnePointEightKb);
                 return Ok(());
             } else if event == "unknown" || event == "noD1" || event == "D1-unspliced" {
-                self.size_class = Some(SizeClass::Unknown); 
+                self.size_class = Some(SizeClass::Unknown);
                 return Ok(());
             }
-        };
+        }
 
         let assay_type = &config.splice_assay_type;
         let post_splice_sequence = match &self.post_splice_sequence {
@@ -122,7 +124,7 @@ impl SpliceEvents {
             None => {
                 self.size_class = Some(SizeClass::Unknown);
                 return Ok(());
-            },
+            }
         };
 
         match assay_type {
@@ -132,9 +134,13 @@ impl SpliceEvents {
                     return Ok(());
                 }
 
-                let search_pattern = &post_splice_sequence[post_splice_sequence.len() - 30..post_splice_sequence.len() - 15];
-                if let Some(aln) = pattern_search(config.full_length_sequence.as_bytes(), search_pattern.as_bytes(), config.distance) {
-
+                let search_pattern = &post_splice_sequence
+                    [post_splice_sequence.len() - 30..post_splice_sequence.len() - 15];
+                if let Some(aln) = pattern_search(
+                    config.full_length_sequence.as_bytes(),
+                    search_pattern.as_bytes(),
+                    config.distance,
+                ) {
                     self.size_class = match assay_type {
                         SpliceAssayType::SizeSpecific => {
                             if aln.ystart < config.d4_breakpoint_position {
@@ -169,11 +175,18 @@ impl SpliceEvents {
                 let mut found_1_8k = false;
                 let mut found_both = false;
 
-                for pattern in slice_of_patterns[..slice_of_patterns.len().min(10)].iter() { // at most 10 patterns will be used to reduce run time. 
-                    if let Some(aln) = pattern_search(config.full_length_sequence.as_bytes(), pattern.as_bytes(), config.distance) {
+                for pattern in slice_of_patterns[..slice_of_patterns.len().min(10)].iter() {
+                    // at most 10 patterns will be used to reduce run time.
+                    if let Some(aln) = pattern_search(
+                        config.full_length_sequence.as_bytes(),
+                        pattern.as_bytes(),
+                        config.distance,
+                    ) {
                         // println!("{:?}", aln.ystart);
                         // println!("{:?}", pattern);
-                        if aln.ystart < config.a7_breakpoint_position && aln.ystart > config.d4_breakpoint_position {
+                        if aln.ystart < config.a7_breakpoint_position
+                            && aln.ystart > config.d4_breakpoint_position
+                        {
                             self.size_class = Some(SizeClass::FourKb); // if we find a 4kb pattern (between D4 and A7), we can stop
                             return Ok(());
                         } else if aln.ystart > config.a7_breakpoint_position {
@@ -186,14 +199,13 @@ impl SpliceEvents {
                     }
                 }
 
-                if found_1_8k  {
+                if found_1_8k {
                     self.size_class = Some(SizeClass::OnePointEightKb); // if we find a 1.8kb pattern (after A7), we can stop, it doesn't matter if we found a both pattern (before D4)
                 } else if found_both {
                     self.size_class = Some(SizeClass::BothClass); // if the only thing we can find is the the pattern before D4, it can be both size classes. 
                 } else {
                     self.size_class = Some(SizeClass::Unknown); // if no alignment is found, we don't know the size class
                 }
-            
             }
         }
 
@@ -202,41 +214,42 @@ impl SpliceEvents {
 
     pub fn predict_final_category(&mut self) {
         let mut key_event = self.splice_category.splice_event.join("_");
-        let key_class =  match self.size_class.as_ref() {
+        let key_class = match self.size_class.as_ref() {
             Some(class) => class.to_string(),
             None => "Unknown".to_string(),
         };
         key_event = key_event + "_" + &key_class;
         self.final_category = Some(key_event);
     }
-
 }
 
 /// MARK: Impl SizeClass
 /// Implements the `Display` trait for the `SpliceEvents` struct, allowing it to be
 /// formatted as a string. The output is a tab-separated string containing the following fields:
-/// 
+///
 /// - `sequence_id`: The identifier for the sequence.
 /// - `umi`: The unique molecular identifier.
 /// - `umi_family`: The UMI family, or "None" if not present.
 /// - `splice_category.splice_event`: A joined string of splice events separated by underscores.
 /// - `size_class`: The size class, or "Unknown" if not specified.
 /// - `final_category`: The final category, or "Unknown" if not specified.
-/// 
+///
 /// This implementation ensures that `SpliceEvents` can be easily converted to a human-readable
 /// string representation for logging or debugging purposes.
 impl Display for SpliceEvents {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
-            f, 
-            "{}\t{}\t{}\t{}\t{}\t{}", 
-            self.sequence_id, 
+            f,
+            "{}\t{}\t{}\t{}\t{}\t{}",
+            self.sequence_id,
             self.umi,
             self.umi_family.as_deref().unwrap_or("None"),
             self.splice_category.splice_event.join("_"),
-            self.size_class.as_ref().unwrap_or(&SizeClass::Unknown).to_string(),
+            self.size_class
+                .as_ref()
+                .unwrap_or(&SizeClass::Unknown)
+                .to_string(),
             self.final_category.as_deref().unwrap_or("Unknown")
-                
         )
     }
 }
@@ -271,12 +284,15 @@ pub fn find_umi_family_from_events(events: Vec<SpliceEvents>) -> Vec<SpliceEvent
 
     for events in events_by_final_category.values() {
         let umis: Vec<&str> = events.iter().map(|event| event.umi.as_str()).collect();
-        
+
         let families = find_umi_family(umis);
 
         outcome_events.extend(events.iter().map(|event| {
             let mut new_event = event.clone();
-            new_event.umi_family = families.iter().find(|&&x| x == event.umi).map(|_| event.umi.clone());
+            new_event.umi_family = families
+                .iter()
+                .find(|&&x| x == event.umi)
+                .map(|_| event.umi.clone());
             new_event
         }));
     }
@@ -300,26 +316,28 @@ fn group_by_final_category(events: Vec<SpliceEvents>) -> HashMap<String, Vec<Spl
 }
 
 fn slice_from_end(input: &str, chunk_size: u8, offset: u8, min_length: u8) -> Vec<String> {
-
     let mut chunks = Vec::new();
 
     let mut end = input.len() - offset as usize;
     while end > (min_length as usize - 1) {
-        let start = if end >= chunk_size as usize { end - chunk_size as usize } else { 0 };
+        let start = if end >= chunk_size as usize {
+            end - chunk_size as usize
+        } else {
+            0
+        };
         chunks.push(input[start..end].to_string());
         end = start;
     }
     chunks
 }
 
-
 /// MARK: Tests
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::open_fasta_file;
-    use tap::Pipe;
     use itertools::Itertools;
+    use tap::Pipe;
     // use std::fs::File;
     // use std::io::Write;
 
@@ -338,15 +356,26 @@ mod tests {
 
     #[test]
     fn test_size_class() {
-
         let nl43_file = "data/nl43.fasta";
         let fasta_reader = open_fasta_file(nl43_file).unwrap();
         let record = fasta_reader.records().next().unwrap().unwrap();
         let nl43_ref_seq = record.seq().to_vec();
-        let search_seq_before_d4 = nl43_ref_seq[5100..5160].to_vec().pipe(String::from_utf8).unwrap();
-        let search_seq_after_a7 = nl43_ref_seq[8000..8060].to_vec().pipe(String::from_utf8).unwrap();
-        let search_seq_between_d4_a7 = nl43_ref_seq[7000..7060].to_vec().pipe(String::from_utf8).unwrap();
-        let search_seq_cross_a7 = nl43_ref_seq[7580..7700].to_vec().pipe(String::from_utf8).unwrap();
+        let search_seq_before_d4 = nl43_ref_seq[5100..5160]
+            .to_vec()
+            .pipe(String::from_utf8)
+            .unwrap();
+        let search_seq_after_a7 = nl43_ref_seq[8000..8060]
+            .to_vec()
+            .pipe(String::from_utf8)
+            .unwrap();
+        let search_seq_between_d4_a7 = nl43_ref_seq[7000..7060]
+            .to_vec()
+            .pipe(String::from_utf8)
+            .unwrap();
+        let search_seq_cross_a7 = nl43_ref_seq[7580..7700]
+            .to_vec()
+            .pipe(String::from_utf8)
+            .unwrap();
 
         let mut splice_event1 = SpliceEvents {
             sequence_id: "test".to_string(),
@@ -361,9 +390,11 @@ mod tests {
             final_category: None,
         };
 
-        let config = SpliceConfig::build("nl43".to_string(), 2, SpliceAssayType::SizeSpecific).unwrap();
-        let config2 = SpliceConfig::build("nl43".to_string(), 2, SpliceAssayType::KMer).unwrap();   
-        let config3 = SpliceConfig::build("nl43".to_string(), 2, SpliceAssayType::RandomReverse).unwrap();
+        let config =
+            SpliceConfig::build("nl43".to_string(), 2, SpliceAssayType::SizeSpecific).unwrap();
+        let config2 = SpliceConfig::build("nl43".to_string(), 2, SpliceAssayType::KMer).unwrap();
+        let config3 =
+            SpliceConfig::build("nl43".to_string(), 2, SpliceAssayType::RandomReverse).unwrap();
 
         splice_event1.find_size_class(&config).unwrap();
         assert_eq!(splice_event1.size_class, Some(SizeClass::Unknown));
@@ -372,10 +403,12 @@ mod tests {
         splice_event1.find_size_class(&config3).unwrap();
         assert_eq!(splice_event1.size_class, Some(SizeClass::Unknown));
 
-
         let mut splice_event2 = splice_event1.clone();
         splice_event2.add_post_splice_sequence(search_seq_before_d4.clone());
-        assert_eq!(splice_event2.post_splice_sequence, Some("TCCTAGACTAGAGCCCTGGAAGCATCCAGGAAGTCAGCCTAAAACTGCTTGTACCAATTG".to_string()));
+        assert_eq!(
+            splice_event2.post_splice_sequence,
+            Some("TCCTAGACTAGAGCCCTGGAAGCATCCAGGAAGTCAGCCTAAAACTGCTTGTACCAATTG".to_string())
+        );
         splice_event2.find_size_class(&config).unwrap(); // should be 4kb if it is size specific
         assert_eq!(splice_event2.size_class, Some(SizeClass::FourKb));
 
@@ -420,8 +453,6 @@ mod tests {
         assert_eq!(splice_event6.size_class, Some(SizeClass::OnePointEightKb));
         splice_event6.find_size_class(&config3).unwrap(); // should be 1.8kb class if it is random reverse
         assert_eq!(splice_event6.size_class, Some(SizeClass::OnePointEightKb));
-
-
     }
 
     #[test]
@@ -441,14 +472,24 @@ mod tests {
             umi: "TTTTCCTAGGATATGGCTCCATAACTTAGGACAA".to_string(),
             umi_family: None,
             splice_category: SpliceChain {
-                splice_event: vec!["D1".to_string(), "A1".to_string(), "D2".to_string(), "A2".to_string(), "D3".to_string(), "A3".to_string(),],
+                splice_event: vec![
+                    "D1".to_string(),
+                    "A1".to_string(),
+                    "D2".to_string(),
+                    "A2".to_string(),
+                    "D3".to_string(),
+                    "A3".to_string(),
+                ],
             },
             size_class: Some(SizeClass::FourKb),
             final_category: None,
         };
         splice_event.predict_final_category();
 
-        assert_eq!(splice_event.to_string(), "test\tTTTTCCTAGGATATGGCTCCATAACTTAGGACAA\tNone\tD1_A1_D2_A2_D3_A3\t4kb\tD1_A1_D2_A2_D3_A3_4kb");
+        assert_eq!(
+            splice_event.to_string(),
+            "test\tTTTTCCTAGGATATGGCTCCATAACTTAGGACAA\tNone\tD1_A1_D2_A2_D3_A3\t4kb\tD1_A1_D2_A2_D3_A3_4kb"
+        );
     }
 
     #[test]
@@ -462,7 +503,14 @@ mod tests {
             umi: "AAAAA".to_string(),
             umi_family: None,
             splice_category: SpliceChain {
-                splice_event: vec!["D1".to_string(), "A1".to_string(), "D2".to_string(), "A2".to_string(), "D3".to_string(), "A3".to_string(),],
+                splice_event: vec![
+                    "D1".to_string(),
+                    "A1".to_string(),
+                    "D2".to_string(),
+                    "A2".to_string(),
+                    "D3".to_string(),
+                    "A3".to_string(),
+                ],
             },
             size_class: Some(SizeClass::FourKb),
             final_category: Some("D1_A1_D2_A2_D3_A3_4kb".to_string()),
@@ -474,7 +522,12 @@ mod tests {
             umi: "AAAAA".to_string(),
             umi_family: Some("AAAAA".to_string()),
             splice_category: SpliceChain {
-                splice_event: vec!["D1".to_string(),  "A2".to_string(), "D3".to_string(), "A7".to_string(),],
+                splice_event: vec![
+                    "D1".to_string(),
+                    "A2".to_string(),
+                    "D3".to_string(),
+                    "A7".to_string(),
+                ],
             },
             size_class: Some(SizeClass::OnePointEightKb),
             final_category: Some("D1_A2_D3_A7_1.8kb".to_string()),
@@ -489,38 +542,50 @@ mod tests {
         events_template_2.umi = "TTTTT".to_string();
         for _ in 0..50 {
             events.push(events_template_1.clone());
-            events.push(events_template_2.clone()); 
+            events.push(events_template_2.clone());
         }
 
         events_template_1.umi = "CCCCC".to_string();
         events_template_2.umi = "CCCCC".to_string();
         for _ in 0..5 {
             events.push(events_template_1.clone());
-            events.push(events_template_2.clone()); 
+            events.push(events_template_2.clone());
         }
 
         events_template_1.umi = "GGGGG".to_string();
         events_template_2.umi = "GGGGG".to_string();
         for _ in 0..500 {
             events.push(events_template_1.clone());
-            events.push(events_template_2.clone()); 
+            events.push(events_template_2.clone());
         }
 
         let result = find_umi_family_from_events(events.clone());
 
-        let family: Vec<String> = result.iter().map(|event| event.umi_family.as_ref().unwrap_or(&"None".to_string()).to_string()).collect();
+        let family: Vec<String> = result
+            .iter()
+            .map(|event| {
+                event
+                    .umi_family
+                    .as_ref()
+                    .unwrap_or(&"None".to_string())
+                    .to_string()
+            })
+            .collect();
         let uniq_family: Vec<String> = family.into_iter().unique().collect();
-        
+
         assert_eq!(uniq_family.len(), 4);
-        assert_eq!(uniq_family, vec!["AAAAA", "TTTTT",  "None","GGGGG",]);
+        assert_eq!(uniq_family, vec!["AAAAA", "TTTTT", "None", "GGGGG",]);
 
         let group = group_by_final_category(events);
 
         let mut group_keys = group.keys().collect::<Vec<_>>();
         group_keys.sort();
-        assert_eq!(group_keys, vec!["D1_A1_D2_A2_D3_A3_4kb", "D1_A2_D3_A7_1.8kb"]);
+        assert_eq!(
+            group_keys,
+            vec!["D1_A1_D2_A2_D3_A3_4kb", "D1_A2_D3_A7_1.8kb"]
+        );
 
-        // TODO: was trying to write the lines to a file but run into warnings. test file write later. 
+        // TODO: was trying to write the lines to a file but run into warnings. test file write later.
         // let mut file = File::create("output.tsv").expect("Unable to create file");
         // writeln!(file,"sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category").expect("Unable to write to file");
         // for res in result.iter() {
