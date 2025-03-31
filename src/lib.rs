@@ -1,10 +1,10 @@
+use bio::io::fasta;
+use rayon::prelude::*;
+use splice_events::find_umi_family_from_events;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
-use bio::io::fasta;
 use std::io::Write;
-use rayon::prelude::*;
-use splice_events::find_umi_family_from_events;
 
 pub mod config;
 pub mod joined_umi_sequence;
@@ -17,7 +17,6 @@ use crate::config::{InputConfig, SpliceConfig};
 
 // TODO: modify error handling
 pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
-
     let forward_n_size = 4; // TODO consider moving to master config
     let umi_size = 14; // TODO consider moving to master config
 
@@ -40,18 +39,23 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     // dbg!(&splice_config);
 
-    let splice_events: Vec<_> = records.par_iter().map(|(r1_record, r2_record)| {
-        let mut joined_umi_sequence = joined_umi_sequence::JoinedUmiSequnce::from_fasta_record(
-            &r1_record,
-            &r2_record,
-            forward_n_size,
-            umi_size);
+    let splice_events: Vec<_> = records
+        .par_iter()
+        .map(|(r1_record, r2_record)| {
+            let mut joined_umi_sequence = joined_umi_sequence::JoinedUmiSequnce::from_fasta_record(
+                &r1_record,
+                &r2_record,
+                forward_n_size,
+                umi_size,
+            );
 
-        joined_umi_sequence.join();
+            joined_umi_sequence.join();
 
-        joined_umi_sequence.check_splice_event(&splice_config).unwrap() // not sure how to pass the error
-
-    }).collect();
+            joined_umi_sequence
+                .check_splice_event(&splice_config)
+                .unwrap() // not sure how to pass the error
+        })
+        .collect();
 
     // dbg!(println!("{:#?}", splice_events));
 
@@ -59,17 +63,21 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     let splice_events_with_umi_family = find_umi_family_from_events(splice_events);
 
     let mut file = File::create("output.tsv")?; //TODO: consider letting user specify output file
-    writeln!(file,"sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category")?;
+    writeln!(
+        file,
+        "sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category"
+    )?;
     for res in splice_events_with_umi_family.iter() {
         writeln!(file, "{}", res.to_string())?;
     }
-
 
     Ok(())
 }
 
 // TODO: Currently only fasta reader. Consider adding fastq reader.
-pub fn open_fasta_file(file_path: &str) -> Result<fasta::Reader<BufReader<BufReader<File>>>, Box<dyn Error>> {
+pub fn open_fasta_file(
+    file_path: &str,
+) -> Result<fasta::Reader<BufReader<BufReader<File>>>, Box<dyn Error>> {
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
     Ok(fasta::Reader::new(reader))

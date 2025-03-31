@@ -2,27 +2,24 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
-use criterion::{criterion_group, criterion_main, Criterion};
-use virust_splicing:: open_fasta_file;
-use virust_splicing::joined_umi_sequence::pattern_search;
-use tap::Pipe;
 use bio::io::fasta;
 use bio::io::fasta::Record;
-use std::error::Error;
+use criterion::{Criterion, criterion_group, criterion_main};
 use rayon::prelude::*;
-use virust_splicing::joined_umi_sequence::JoinedUmiSequnce;
-use virust_splicing::config::InputConfig;
-use virust_splicing::splice_events::find_umi_family_from_events;
-use virust_splicing::config::SpliceConfig;
-use virust_splicing::config::SpliceAssayType;
+use std::error::Error;
 use std::sync::LazyLock;
-
+use tap::Pipe;
+use virust_splicing::config::InputConfig;
+use virust_splicing::config::SpliceAssayType;
+use virust_splicing::config::SpliceConfig;
+use virust_splicing::joined_umi_sequence::JoinedUmiSequnce;
+use virust_splicing::joined_umi_sequence::pattern_search;
+use virust_splicing::open_fasta_file;
+use virust_splicing::splice_events::find_umi_family_from_events;
 
 // typical pattern matching senaria in our dataset
-const PATTERN :&[u8] = b"TAGATGTAAAAGGCACCAAGGAAGCCTTAG";
+const PATTERN: &[u8] = b"TAGATGTAAAAGGCACCAAGGAAGCCTTAG";
 const SEQUENCE :&[u8] = b"CTATTGTGTGCATCAAAGGATAGATGTAAAAGACACCAAGGAAGCCTTAGATAAGATAGAGGAAGAGCAAAACAAAAGTAAGAAAAAGGCACAGCAAGCAGCAGCTGACACAGGAAACAACAGCCAGGTCAGCCAAAATTACCCTATAGTGCAGAACCTCCAGGGGCAAATGGTACATCAGGCCATATCACCTAGAACTTTAAATGCATGGGTAAAAGTAGTAGAAGAGAAGGCTTTCAGCCCAGAAGTAATACCCATGTTTTCAGCATTATCAGAAGGAGCCACCCCACAAGATTTAAA";
-
-
 
 static CONFIG: LazyLock<InputConfig> = LazyLock::new(|| InputConfig {
     query: "nl43".to_string(),
@@ -61,15 +58,17 @@ fn run_rayon() -> Result<usize, Box<dyn Error>> {
 
     let records = records?;
 
-    let count: Vec<_> = records.par_iter().map(|(r1_record, r2_record)| {
-        let mut joined_umi_sequence = JoinedUmiSequnce::from_fasta_record(&r1_record, &r2_record, 4, 11);
-        joined_umi_sequence.join();
-        joined_umi_sequence.find_sequence_for_search().len()
-
-    }).collect();
+    let count: Vec<_> = records
+        .par_iter()
+        .map(|(r1_record, r2_record)| {
+            let mut joined_umi_sequence =
+                JoinedUmiSequnce::from_fasta_record(&r1_record, &r2_record, 4, 11);
+            joined_umi_sequence.join();
+            joined_umi_sequence.find_sequence_for_search().len()
+        })
+        .collect();
 
     Ok(count.iter().sum())
-
 }
 
 fn run() -> Result<usize, Box<dyn Error>> {
@@ -87,11 +86,15 @@ fn run() -> Result<usize, Box<dyn Error>> {
 
     let records = records?;
 
-    let count: Vec<_> = records.iter().map(|(r1_record, r2_record)| {
-        let mut joined_umi_sequence = JoinedUmiSequnce::from_fasta_record(&r1_record, &r2_record, 4, 11);
-        joined_umi_sequence.join();
-        joined_umi_sequence.find_sequence_for_search().len()
-    }).collect();
+    let count: Vec<_> = records
+        .iter()
+        .map(|(r1_record, r2_record)| {
+            let mut joined_umi_sequence =
+                JoinedUmiSequnce::from_fasta_record(&r1_record, &r2_record, 4, 11);
+            joined_umi_sequence.join();
+            joined_umi_sequence.find_sequence_for_search().len()
+        })
+        .collect();
 
     Ok(count.iter().sum())
 }
@@ -111,7 +114,7 @@ fn run_chunk() -> Result<usize, Box<dyn Error>> {
     let chunk_size = 1000;
     let mut count = Vec::new();
 
-    loop{
+    loop {
         let mut chunk = Vec::with_capacity(chunk_size);
 
         for _ in 0..chunk_size {
@@ -123,27 +126,31 @@ fn run_chunk() -> Result<usize, Box<dyn Error>> {
             }
         }
 
-         // Break the outer loop if no records were collected.
-         if chunk.is_empty() {
+        // Break the outer loop if no records were collected.
+        if chunk.is_empty() {
             break;
         }
 
         // Process the current chunk concurrently.
-        let mut c: Vec<_> = chunk.par_iter().map(|(r1_record, r2_record)| {
-            let mut joined_umi_sequence = JoinedUmiSequnce::from_fasta_record(&r1_record, &r2_record, 4, 11);
-            joined_umi_sequence.join();
-            joined_umi_sequence.find_sequence_for_search().len()
-        }).collect();
+        let mut c: Vec<_> = chunk
+            .par_iter()
+            .map(|(r1_record, r2_record)| {
+                let mut joined_umi_sequence =
+                    JoinedUmiSequnce::from_fasta_record(&r1_record, &r2_record, 4, 11);
+                joined_umi_sequence.join();
+                joined_umi_sequence.find_sequence_for_search().len()
+            })
+            .collect();
 
         count.append(&mut c);
     }
     Ok(count.iter().sum())
 }
 
-
-
-fn integrated_bm(config: InputConfig, records: &Vec<(Record, Record)>) -> Result<(), Box<dyn Error>> {
-
+fn integrated_bm(
+    config: InputConfig,
+    records: &Vec<(Record, Record)>,
+) -> Result<(), Box<dyn Error>> {
     let forward_n_size = 4;
     let umi_size = 14;
 
@@ -166,29 +173,30 @@ fn integrated_bm(config: InputConfig, records: &Vec<(Record, Record)>) -> Result
 
     // dbg!(&splice_config);
 
-    let splice_events: Vec<_> = records.par_iter().map(|(r1_record, r2_record)| {
-        let mut joined_umi_sequence = JoinedUmiSequnce::from_fasta_record(
-            &r1_record,
-            &r2_record,
-            forward_n_size,
-            umi_size);
+    let splice_events: Vec<_> = records
+        .par_iter()
+        .map(|(r1_record, r2_record)| {
+            let mut joined_umi_sequence = JoinedUmiSequnce::from_fasta_record(
+                &r1_record,
+                &r2_record,
+                forward_n_size,
+                umi_size,
+            );
 
-        joined_umi_sequence.join();
+            joined_umi_sequence.join();
 
-        joined_umi_sequence.check_splice_event(&splice_config).unwrap() // not sure how to pass the error
-
-    }).collect();
-
+            joined_umi_sequence
+                .check_splice_event(&splice_config)
+                .unwrap() // not sure how to pass the error
+        })
+        .collect();
 
     // find_umi_family_from_events(splice_events);
 
     Ok(())
 }
 
-
-
 fn criterion_benchmark(c: &mut Criterion) {
-
     let r1_file_path = &CONFIG.filename_r1;
     let r2_file_path = &CONFIG.filename_r2;
 
@@ -204,11 +212,12 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let records = records.unwrap();
 
-
     // c.bench_function("Pattern Search", |b| b.iter(|| pattern_search(SEQUENCE, PATTERN, 2).unwrap()));
     // c.bench_function("Read file", |b| b.iter(|| bench_fasta_reader()));
     // c.bench_function("End Join", |b| b.iter(|| bench_end_join()));
-    c.bench_function("Integrated Benchmark", |b| b.iter(|| integrated_bm((*CONFIG).clone(), &records)));
+    c.bench_function("Integrated Benchmark", |b| {
+        b.iter(|| integrated_bm((*CONFIG).clone(), &records))
+    });
 
     // let mut group = c.benchmark_group("expensive reading");
     // group.sample_size(10);
@@ -216,7 +225,6 @@ fn criterion_benchmark(c: &mut Criterion) {
     // group.bench_function("Sequential", |b| b.iter(|| run().unwrap()));
     // group.bench_function("Chunked", |b| b.iter(|| run_chunk().unwrap()));
 }
-
 
 criterion_group!(benches, criterion_benchmark);
 criterion_main!(benches);

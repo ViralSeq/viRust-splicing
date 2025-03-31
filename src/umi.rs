@@ -1,11 +1,11 @@
-use rayon::prelude::*;
 use itertools::Itertools;
+use plotters::prelude::*;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
+use rand_distr::Normal;
+use rayon::prelude::*;
 use std::collections::HashMap;
 use std::error::Error;
-use rand_distr::Normal;
-use plotters::prelude::*;
 
 /// Finds UMI families based on their frequency in the input list.
 ///
@@ -33,7 +33,7 @@ pub fn find_umi_family(mut umis: Vec<&str>) -> Vec<&str> {
     let umi_cut_off = umi_cut_off(*max_freq);
 
     umi_freq.into_iter().for_each(|(count, umi)| {
-        if count > umi_cut_off as usize{
+        if count > umi_cut_off as usize {
             families.push(umi);
         }
     });
@@ -51,17 +51,15 @@ pub fn find_umi_family(mut umis: Vec<&str>) -> Vec<&str> {
 /// # Returns
 ///
 /// A string representing the generated UMI.
-pub fn generate_one_umi(
-    umi_length: u32,
-    seed:u64
-) -> String {
+pub fn generate_one_umi(umi_length: u32, seed: u64) -> String {
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     let bases = ['A', 'T', 'C', 'G'];
     let mut umi = String::new();
 
     // Generate a single UMI
     for _ in 0..umi_length {
-        let base = bases.choose(&mut rng)
+        let base = bases
+            .choose(&mut rng)
             .expect("Failed to choose a base")
             .to_owned(); // Choose a random base from the array
         umi.push(base);
@@ -80,14 +78,11 @@ pub fn generate_one_umi(
 /// # Returns
 ///
 /// A vector of strings representing the generated UMIs.
-pub fn generate_umis(
-    umi_length: u32,
-    num_umis: u32
-) -> Vec<String> {
+pub fn generate_umis(umi_length: u32, num_umis: u32) -> Vec<String> {
     let mut umis: Vec<String> = Vec::new();
     // Generate UMIs
     for i in 0..num_umis {
-        let umi = generate_one_umi(umi_length, (i+1) as u64); // Use i+1 as seed for reproducibility
+        let umi = generate_one_umi(umi_length, (i + 1) as u64); // Use i+1 as seed for reproducibility
         umis.push(umi);
     }
     umis
@@ -110,12 +105,15 @@ pub fn simulate_umi_distribution(
     num_sequences: u32,
     umi_length: u32,
     umi_number: u32,
-    seed:u64,
-    mutation_rate: f64
+    seed: u64,
+    mutation_rate: f64,
 ) -> Result<HashMap<String, u32>, Box<dyn Error>> {
     // Validate the number of UMIs by length
     if !validate_umis_by_length(umi_number, umi_length) {
-        return Err("The number of UMIs exceeds the maximum possible unique UMIs for the given length.".into());
+        return Err(
+            "The number of UMIs exceeds the maximum possible unique UMIs for the given length."
+                .into(),
+        );
     }
     let mut umi_distribution: HashMap<String, u32> = HashMap::new();
 
@@ -133,8 +131,9 @@ pub fn simulate_umi_distribution(
         // Randomly select a UMI from the generated UMIs
         // Generate a random number from the normal distribution
         let mut random_number = normal.sample(&mut rng).round() as isize;
-        random_number = random_number.max(0) // Ensure the index is non-negative
-                                     .min(umi_number as isize - 1); // Ensure the index is within bounds
+        random_number = random_number
+            .max(0) // Ensure the index is non-negative
+            .min(umi_number as isize - 1); // Ensure the index is within bounds
 
         let selected_umi = &umis[random_number as usize];
 
@@ -157,10 +156,7 @@ pub fn simulate_umi_distribution(
 /// # Returns
 ///
 /// A string representing the mutated UMI.
-pub fn mutate_umi(
-    umi: &str,
-    mutation_rate: f64,
-) -> String {
+pub fn mutate_umi(umi: &str, mutation_rate: f64) -> String {
     let mut rng = ChaCha8Rng::from_os_rng();
     let bases = ['A', 'T', 'C', 'G'];
     let mut mutated_umi = String::new();
@@ -170,7 +166,8 @@ pub fn mutate_umi(
         new_base_pool.retain(|c| c != &base); // Exclude the original base
         if rng.random::<f64>() < mutation_rate {
             // Mutate the base
-            let new_base = new_base_pool.choose(&mut rng)
+            let new_base = new_base_pool
+                .choose(&mut rng)
                 .expect("Failed to choose a base")
                 .to_owned(); // Choose a random base from the vec of bases excluding the original base
             mutated_umi.push(new_base);
@@ -192,14 +189,10 @@ pub fn mutate_umi(
 /// # Returns
 ///
 /// `true` if the number of UMIs is valid, `false` otherwise.
-pub fn validate_umis_by_length(
-    num_umis: u32,
-    umi_length: u32,
-) -> bool {
-
+pub fn validate_umis_by_length(num_umis: u32, umi_length: u32) -> bool {
     let maxi_umis = 4.0_f64.powi(umi_length as i32); // Maximum number of unique UMIs possible
     // Check if the number of UMIs exceeds the maximum possible unique UMIs
-    if num_umis as f64  > maxi_umis {
+    if num_umis as f64 > maxi_umis {
         false
     } else {
         true
@@ -218,7 +211,7 @@ pub fn validate_umis_by_length(
 /// An empty result if successful, or an error if plotting fails.
 pub fn plot_umi_distribution(
     umi_distribution: &HashMap<String, u32>,
-    path: &str
+    path: &str,
 ) -> Result<(), Box<dyn Error>> {
     let mut dist = umi_distribution.values().cloned().collect::<Vec<u32>>();
 
@@ -227,57 +220,56 @@ pub fn plot_umi_distribution(
 
     // Plotting code can be added here using a plotting library
     let mut expanded_umi_list: Vec<String> = Vec::new();
-        for (umi, count) in umi_distribution {
-            for _ in 0..*count {
-                expanded_umi_list.push(umi.clone());
-            }
+    for (umi, count) in umi_distribution {
+        for _ in 0..*count {
+            expanded_umi_list.push(umi.clone());
         }
-       
-        let root = BitMapBackend::new(path, (640, 480))
-            .into_drawing_area();
-        root.fill(&WHITE)?;
+    }
 
-        let max_bin = dist.iter().max().unwrap_or(&0) +1;
-        let bins = (0..=max_bin).step_by(1).collect::<Vec<_>>();
+    let root = BitMapBackend::new(path, (640, 480)).into_drawing_area();
+    root.fill(&WHITE)?;
 
-        let mut histogram = vec![0; bins.len() - 1];
-        for &value in &dist {
-            for i in 0..bins.len() - 1 {
+    let max_bin = dist.iter().max().unwrap_or(&0) + 1;
+    let bins = (0..=max_bin).step_by(1).collect::<Vec<_>>();
+
+    let mut histogram = vec![0; bins.len() - 1];
+    for &value in &dist {
+        for i in 0..bins.len() - 1 {
             if value >= bins[i] && value < bins[i + 1] {
                 histogram[i] += 1;
                 break;
             }
-            }
         }
+    }
 
-        let mut chart = ChartBuilder::on(&root)
-            .caption("UMI Distribution Histogram", ("sans-serif", 20))
-            .margin(10)
-            .x_label_area_size(30)
-            .y_label_area_size(40)
-            .build_cartesian_2d(
-            dist.iter().map(|&x| x as u32).min().unwrap()..dist.iter().map(|&x| x as u32).max().unwrap(),
+    let mut chart = ChartBuilder::on(&root)
+        .caption("UMI Distribution Histogram", ("sans-serif", 20))
+        .margin(10)
+        .x_label_area_size(30)
+        .y_label_area_size(40)
+        .build_cartesian_2d(
+            dist.iter().map(|&x| x as u32).min().unwrap()
+                ..dist.iter().map(|&x| x as u32).max().unwrap(),
             0..*histogram.iter().max().unwrap(),
-            )?;
+        )?;
 
-        chart
-            .configure_mesh()
-            .x_desc("UMI Bin Size")
-            .y_desc("Number of Unique UMIs")
-            .draw()?;
- 
+    chart
+        .configure_mesh()
+        .x_desc("UMI Bin Size")
+        .y_desc("Number of Unique UMIs")
+        .draw()?;
 
-        chart
-            .draw_series(
-            dist.iter()
-            .map(|&value| {
-                Rectangle::new([(value as u32, 0), (value as u32 + 1, histogram[value as usize])], BLUE.filled())
-            }),
-            )?;
-   
+    chart.draw_series(dist.iter().map(|&value| {
+        Rectangle::new(
+            [
+                (value as u32, 0),
+                (value as u32 + 1, histogram[value as usize]),
+            ],
+            BLUE.filled(),
+        )
+    }))?;
 
-        Ok(())
-
+    Ok(())
 }
 
 /// Calculates the cutoff frequency for UMI families based on the maximum frequency.
@@ -290,12 +282,11 @@ pub fn plot_umi_distribution(
 ///
 /// An integer representing the cutoff frequency.
 fn umi_cut_off(m: usize) -> i32 {
-    let n :f64;
+    let n: f64;
     if m <= 10 {
         n = 2.0;
     } else {
-        n = -9.59e-27 * (m as f64).powi(6)
-            + 3.27e-21 * (m as f64).powi(5)
+        n = -9.59e-27 * (m as f64).powi(6) + 3.27e-21 * (m as f64).powi(5)
             - 3.05e-16 * (m as f64).powi(4)
             + 1.2e-11 * (m as f64).powi(3)
             - 2.19e-7 * (m as f64).powi(2)
@@ -310,12 +301,10 @@ fn umi_cut_off(m: usize) -> i32 {
     n_rounded
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::iter::repeat;
-
 
     #[test]
     fn test_umi_cut_off() {
@@ -341,12 +330,8 @@ mod tests {
         let mut filtered_umis: Vec<Option<String>> = Vec::new();
 
         filtered_umis.extend(
-            umis
-            .iter()
-            .map(
-                |x| {families.iter().find(|&y|x == y).map(|y|y.to_string())
-                }
-            )
+            umis.iter()
+                .map(|x| families.iter().find(|&y| x == y).map(|y| y.to_string())),
         );
 
         let n = filtered_umis.iter().filter(|umi| umi.is_some()).count();
@@ -374,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_umis(){
+    fn test_generate_umis() {
         let umi_length = 10;
         let num_umis = 5;
         let umis = generate_umis(umi_length, num_umis);
@@ -402,11 +387,17 @@ mod tests {
 
         // This test should pass because 1000 UMIs is less than the maximum possible unique UMIs for length 5
         let is_valid = validate_umis_by_length(num_umis, umi_length);
-        assert!(is_valid, "The number of UMIs should be valid for the given length");
+        assert!(
+            is_valid,
+            "The number of UMIs should be valid for the given length"
+        );
         // Check for a case where the number of UMIs exceeds the maximum possible unique UMIs
         let num_umis_invalid = 200000; // This is more than the maximum possible unique UMIs for length 5
         let is_valid_invalid = validate_umis_by_length(num_umis_invalid, umi_length);
-        assert!(!is_valid_invalid, "The number of UMIs should not be valid for the given length");
+        assert!(
+            !is_valid_invalid,
+            "The number of UMIs should not be valid for the given length"
+        );
     }
 
     #[test]
@@ -416,8 +407,7 @@ mod tests {
         let umi_number = 100; // Number of unique UMIs to generate
 
         // Simulate the UMI distribution
-        let result = simulate_umi_distribution(
-            num_sequences, umi_length, umi_number, 1, 0.05);
+        let result = simulate_umi_distribution(num_sequences, umi_length, umi_number, 1, 0.05);
 
         // Check if the result is Ok
         assert!(result.is_ok(), "The simulation should succeed");
@@ -436,9 +426,7 @@ mod tests {
 
         assert_eq!(umi_distribution.values().sum::<u32>(), num_sequences);
         // Check if the counts are within the expected range
-
     }
-
 
     #[test]
     #[should_panic]
@@ -448,8 +436,7 @@ mod tests {
         let umi_number = 200000; // This exceeds the maximum possible unique UMIs for length 5
 
         // Simulate the UMI distribution
-        let result = simulate_umi_distribution(
-            num_sequences, umi_length, umi_number, 1, 0.05);
+        let result = simulate_umi_distribution(num_sequences, umi_length, umi_number, 1, 0.05);
 
         // Check if the result is Ok
         assert!(result.is_ok(), "The simulation should succeed");
