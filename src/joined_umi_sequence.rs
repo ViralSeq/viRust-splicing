@@ -10,16 +10,18 @@
 //! The core structure in this module is `JoinedUmiSequence`, which stores parsed read data and facilitates downstream
 //! processing and splice event detection.
 
-use bio::io::fasta;
-use tap::Pipe;
-use bio::alphabets::dna;
-use serde::{Deserialize, Serialize};
-use bio::pattern_matching::myers;
-use bio::alignment::Alignment;
-use std::error::Error;
 use crate::config::{SpliceConfig, SpliceStep};
-use crate::splice_events::{SpliceEvents, SpliceChain};
+use crate::splice_events::{SpliceChain, SpliceEvents};
+use bio::alignment::Alignment;
+use bio::alphabets::dna;
+///MARK: Library imports
+use bio::io::fasta;
+use bio::pattern_matching::myers;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
+use tap::Pipe;
 
+///MARK: JoinedUmiSequence
 /// Represents a joined UMI sequence derived from paired-end FASTA records.
 ///
 /// This struct contains metadata and sequences extracted from the forward and reverse reads,
@@ -51,11 +53,26 @@ impl JoinedUmiSequnce {
     ///
     /// # Returns
     /// A new `JoinedUmiSequnce` instance.
-    pub fn from_fasta_record (record_r1: &fasta::Record, record_r2: &fasta::Record, forward_n_size: usize, umi_size: usize) -> JoinedUmiSequnce {
+    pub fn from_fasta_record(
+        record_r1: &fasta::Record,
+        record_r2: &fasta::Record,
+        forward_n_size: usize,
+        umi_size: usize,
+    ) -> JoinedUmiSequnce {
         let sequence_id = record_r1.id()[..(record_r1.id().len() - 3)].to_string();
 
-        let forward_seq = record_r1.seq().to_vec().pipe(String::from_utf8).unwrap().to_uppercase();
-        let reverse_seq = record_r2.seq().to_vec().pipe(String::from_utf8).unwrap().to_uppercase();
+        let forward_seq = record_r1
+            .seq()
+            .to_vec()
+            .pipe(String::from_utf8)
+            .unwrap()
+            .to_uppercase();
+        let reverse_seq = record_r2
+            .seq()
+            .to_vec()
+            .pipe(String::from_utf8)
+            .unwrap()
+            .to_uppercase();
 
         let forward_ns = forward_seq[..forward_n_size].to_string();
         let forward_sequence = forward_seq[forward_n_size..].to_string();
@@ -79,7 +96,12 @@ impl JoinedUmiSequnce {
     pub fn join(&mut self) {
         let min_overlap = 10; // TODO Minimum overlap length required for merging. Consider moving to master config.
         let error_rate = 0.02; // TODO Maximum error rate allowed in the overlap region. Consider moving to master config.
-        if let Some(joined) = join_reads(&self.forward_sequence, &self.reverse_sequence, min_overlap, error_rate) {
+        if let Some(joined) = join_reads(
+            &self.forward_sequence,
+            &self.reverse_sequence,
+            min_overlap,
+            error_rate,
+        ) {
             self.joined_sequence = Some(joined);
         }
     }
@@ -95,7 +117,11 @@ impl JoinedUmiSequnce {
             return None;
         } else {
             let seq = self.joined_sequence.as_ref().unwrap();
-            Some(fasta::Record::with_attrs(&id, desc.as_deref(), seq.as_bytes()))
+            Some(fasta::Record::with_attrs(
+                &id,
+                desc.as_deref(),
+                seq.as_bytes(),
+            ))
         }
     }
 
@@ -112,6 +138,7 @@ impl JoinedUmiSequnce {
         }
     }
 
+    /// MARK: Splice event check
     /// Checks for splice events in the sequence using the provided splice configuration.
     ///
     /// # Arguments
@@ -119,7 +146,10 @@ impl JoinedUmiSequnce {
     ///
     /// # Returns
     /// A `Result` containing the detected `SpliceEvents` or an error.
-    pub fn check_splice_event(&self, splice_config: &SpliceConfig) -> Result<SpliceEvents, Box<dyn Error>> {
+    pub fn check_splice_event(
+        &self,
+        splice_config: &SpliceConfig,
+    ) -> Result<SpliceEvents, Box<dyn Error>> {
         let seq = self.find_sequence_for_search();
         let seq = seq.as_bytes();
         let mut chain = SpliceChain::new();
@@ -132,11 +162,9 @@ impl JoinedUmiSequnce {
         event.predict_final_category();
         Ok(event)
     }
-
 }
 
-
-
+/// MARK: Utility functions
 /// Processes splicing steps recursively based on the stage.
 ///
 /// The stages are defined as:
@@ -172,7 +200,7 @@ fn process_splice_rec<'a>(
                 chain.add_splice_event("noD1".to_string());
                 seq
             }
-        },
+        }
         // Stage 2: Process the acceptor immediately after D1.
         2 => {
             // println!("step 2");
@@ -183,7 +211,6 @@ fn process_splice_rec<'a>(
             if let Some((acc, new_seq)) =
                 pattern_search_trim_seq_batch(seq, &config.d1_to_all, distance)
             {
-
                 chain.add_splice_event(acc.clone());
                 match acc.as_str() {
                     "A1" => process_splice_rec(new_seq, chain, config, 3),
@@ -194,7 +221,7 @@ fn process_splice_rec<'a>(
                 chain.add_splice_event("unknown".to_string());
                 seq
             }
-        },
+        }
         // Stage 3: Process D2 (for the A1 branch).
         3 => {
             if let Some(new_seq) = pattern_search_trim_seq(seq, config.d2.as_bytes(), distance) {
@@ -204,7 +231,7 @@ fn process_splice_rec<'a>(
                 chain.add_splice_event("noD2".to_string());
                 seq
             }
-        },
+        }
         // Stage 4: Process acceptor after D2.
         4 => {
             if let Some((acc, new_seq)) =
@@ -220,7 +247,7 @@ fn process_splice_rec<'a>(
                 chain.add_splice_event("unknown".to_string());
                 seq
             }
-        },
+        }
         // Stage 5: Process D3 branch (common for any A2 outcome).
         5 => {
             if let Some(new_seq) = pattern_search_trim_seq(seq, config.d3.as_bytes(), distance) {
@@ -230,7 +257,7 @@ fn process_splice_rec<'a>(
                 chain.add_splice_event("noD3".to_string());
                 seq
             }
-        },
+        }
         // Stage 6: Process D2b for the "D2-unspliced" branch.
         6 => {
             if let Some(new_seq) = pattern_search_trim_seq(seq, config.d2b.as_bytes(), distance) {
@@ -252,7 +279,7 @@ fn process_splice_rec<'a>(
                 chain.add_splice_event("noD2b".to_string());
                 seq
             }
-        },
+        }
         // Stage 7: Process the acceptor downstream of D3.
         7 => {
             // println!("step 7");
@@ -268,7 +295,7 @@ fn process_splice_rec<'a>(
                 chain.add_splice_event("unknown".to_string());
                 seq
             }
-        },
+        }
         _ => seq,
     }
 }
@@ -301,11 +328,7 @@ pub fn reverse_complement(seq: &str) -> String {
 /// `true` if the overlap is acceptable, `false` otherwise.
 fn is_overlap_acceptable(s1: &str, s2: &str, error_rate: f64) -> bool {
     let overlap_length = s1.len();
-    let mismatches = s1
-        .chars()
-        .zip(s2.chars())
-        .filter(|(a, b)| a != b)
-        .count();
+    let mismatches = s1.chars().zip(s2.chars()).filter(|(a, b)| a != b).count();
     // The overlap is acceptable if the proportion of mismatches does not exceed error_rate.
     (mismatches as f64) <= (overlap_length as f64 * error_rate)
 }
@@ -364,7 +387,6 @@ fn join_reads(r1: &str, r2: &str, min_overlap: usize, error_rate: f64) -> Option
 /// # Returns
 /// An `Option<Alignment>` containing the best alignment, or `None` if no match is found.
 pub fn pattern_search(sequence: &[u8], pattern: &[u8], distance: u8) -> Option<Alignment> {
-
     let mut aln = Alignment::default();
     let mut myers = myers::Myers::<u64>::new(pattern);
     let mut lazy_matches = myers.find_all_lazy(sequence, distance);
@@ -375,9 +397,7 @@ pub fn pattern_search(sequence: &[u8], pattern: &[u8], distance: u8) -> Option<A
 
             Some(aln)
         }
-        None => {
-            None
-        }
+        None => None,
     }
 }
 
@@ -390,8 +410,11 @@ pub fn pattern_search(sequence: &[u8], pattern: &[u8], distance: u8) -> Option<A
 ///
 /// # Returns
 /// An `Option<&[u8]>` containing the trimmed sequence, or `None` if no match is found.
-pub fn pattern_search_trim_seq<'a>(sequence: &'a [u8], pattern: &[u8], distance: u8) -> Option<&'a [u8]> {
-
+pub fn pattern_search_trim_seq<'a>(
+    sequence: &'a [u8],
+    pattern: &[u8],
+    distance: u8,
+) -> Option<&'a [u8]> {
     let mut aln = Alignment::default();
     let mut myers = myers::Myers::<u64>::new(pattern);
     let mut lazy_matches = myers.find_all_lazy(sequence, distance);
@@ -402,9 +425,7 @@ pub fn pattern_search_trim_seq<'a>(sequence: &'a [u8], pattern: &[u8], distance:
 
             Some(&sequence[aln.ystart..])
         }
-        None => {
-            None
-        }
+        None => None,
     }
 }
 
@@ -417,16 +438,18 @@ pub fn pattern_search_trim_seq<'a>(sequence: &'a [u8], pattern: &[u8], distance:
 ///
 /// # Returns
 /// An `Option<(String, &[u8])>` containing the matched acceptor and the trimmed sequence, or `None` if no match is found.
-pub fn pattern_search_trim_seq_batch<'a>(sequence: &'a [u8], list: &Vec<SpliceStep>, distance: u8) -> Option<(String, &'a [u8])> {
-
+pub fn pattern_search_trim_seq_batch<'a>(
+    sequence: &'a [u8],
+    list: &Vec<SpliceStep>,
+    distance: u8,
+) -> Option<(String, &'a [u8])> {
     for step in list {
-
         let pattern = step.pattern.as_bytes();
 
         if let Some(trimmed_sequence) = pattern_search_trim_seq(sequence, pattern, distance) {
             // println!("matched acceptor: {:?}", step.acceptor);
-            let matched_acceptor = step.acceptor.clone();   
-            return Some((matched_acceptor, trimmed_sequence))
+            let matched_acceptor = step.acceptor.clone();
+            return Some((matched_acceptor, trimmed_sequence));
         }
     }
     None
@@ -446,8 +469,14 @@ mod tests {
     }
 
     #[test]
-    fn test_find_overlap(){
-        let seq1 = &format!("{}{}{}{}", "A".repeat(6), "C".repeat(6), "T".repeat(6), "G".repeat(6));
+    fn test_find_overlap() {
+        let seq1 = &format!(
+            "{}{}{}{}",
+            "A".repeat(6),
+            "C".repeat(6),
+            "T".repeat(6),
+            "G".repeat(6)
+        );
         let seq2 = "GGGGGGTTTTTCCCCCCTTTTT";
         let seq3 = "CCCCCCTTTTTTGGGGGGCCCAAAGG";
         let seq4 = "GGGGGGGGGGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -471,15 +500,4 @@ mod tests {
         assert_eq!(joined_umi_sequence.joined_seq_to_fasta_record(), Some(fasta::Record::with_attrs("seq1-joined", Some("ForwardNs: NNNN, UMI: NNNNNNNNNNNNNN"), b"TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT")));
         assert_eq!(joined_umi_sequence.find_sequence_for_search(), "TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT".to_string());
     }
-
-
-
-
-
 }
-
-
-
-
-
-

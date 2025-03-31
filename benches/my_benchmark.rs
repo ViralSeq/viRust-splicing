@@ -29,7 +29,7 @@ static CONFIG: LazyLock<InputConfig> = LazyLock::new(|| InputConfig {
     distance: 1,
     filename_r1: "sim_data/mockseq_r1.fasta".to_string(),
     filename_r2: "sim_data/mockseq_r2.fasta".to_string(),
-    assay_type: SpliceAssayType::RandomReverse, // Kmer and SizeSpecific are about 10 times faster than random reverse. 
+    assay_type: SpliceAssayType::RandomReverse, // Kmer and SizeSpecific are about 5 times faster than random reverse.
 });
 
 fn bench_fasta_reader() {
@@ -144,8 +144,8 @@ fn run_chunk() -> Result<usize, Box<dyn Error>> {
 
 fn integrated_bm(config: InputConfig, records: &Vec<(Record, Record)>) -> Result<(), Box<dyn Error>> {
 
-    let forward_n_size = 4; 
-    let umi_size = 14; 
+    let forward_n_size = 4;
+    let umi_size = 14;
 
     let r1_file_path = &config.filename_r1;
     let r2_file_path = &config.filename_r2;

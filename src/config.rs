@@ -1,5 +1,5 @@
 //! # config.rs
-//! 
+//!
 //! This module defines the configuration structures and logic for parsing input parameters
 //! and building splice analysis configurations for HIV splicing assays.
 //! It includes:
@@ -7,10 +7,10 @@
 //! - `SpliceConfig`: Constructs a full splicing configuration from a config file and fasta data.
 //! - `SpliceStep`: Represents a splice step pattern between donor and acceptor sites.
 //! - `SpliceAssayType`: Enumerates types of splice assays.
-//! 
+//!
 //! The configuration is based on a strain-specific query list loaded from a TOML file,
 //! and includes logic to build all relevant splicing steps for downstream analysis.
-//! 
+//!
 //! This module also includes test cases to verify correct behavior of configuration logic.
 
 use config::Config;
@@ -23,6 +23,7 @@ use crate::open_fasta_file;
 
 ///
 /// Configuration parsed from CLI input arguments for initiating the splicing pipeline.
+///TODO: Add output path
 #[derive(Debug,Clone)]
 pub struct InputConfig {
     pub query: String,
@@ -30,6 +31,7 @@ pub struct InputConfig {
     pub filename_r1: String,
     pub filename_r2: String,
     pub assay_type: SpliceAssayType,
+    // pub output_path: String,
 }
 
 ///
@@ -77,6 +79,7 @@ pub enum SpliceAssayType {
     SizeSpecific
 }
 
+
 impl InputConfig {
 
     pub fn new(
@@ -97,7 +100,8 @@ impl InputConfig {
     ///
     /// Parses command-line arguments into an `InputConfig` structure.
     /// TODO: Add more detailed argument parsing and validation. Consider using a library like `clap`.
-    /// 
+    /// TODO: Output config to a file
+    ///
     /// # Errors
     /// Returns an error if the arguments are malformed or invalid.
     pub fn build() -> Result<InputConfig, Box<dyn Error>> {
@@ -142,10 +146,10 @@ impl InputConfig {
 impl SpliceConfig {
     ///
     /// Builds a `SpliceConfig` from a given strain, distance, and assay type.
-    /// 
+    ///
     /// This function loads the splice form config and reference FASTA file,
     /// and prepares splicing steps accordingly.
-    /// 
+    ///
     /// # Errors
     /// Returns an error if the config or FASTA file cannot be read.
     pub fn build(strain: String, distance: u8, splice_assay_type: SpliceAssayType) -> Result<SpliceConfig, Box<dyn Error>> {
@@ -276,7 +280,7 @@ pub fn from_splice_form_file_to_hashmap(strain: &str) -> Result<HashMap<String, 
 impl SpliceStep {
     ///
     /// Constructs a list of `SpliceStep` entries from a donor and multiple acceptors.
-    /// 
+    ///
     /// # Arguments
     /// * `donor` - The donor splice site key.
     /// * `acceptor_list` - A list of acceptor splice site keys.

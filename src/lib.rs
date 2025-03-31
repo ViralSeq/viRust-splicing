@@ -53,12 +53,12 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     }).collect();
 
-    // dbg!(println!("{:#?}", splice_events)); 
+    // dbg!(println!("{:#?}", splice_events));
 
     // TODO: efficiency test needed
     let splice_events_with_umi_family = find_umi_family_from_events(splice_events);
 
-    let mut file = File::create("output.tsv")?;
+    let mut file = File::create("output.tsv")?; //TODO: consider letting user specify output file
     writeln!(file,"sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category")?;
     for res in splice_events_with_umi_family.iter() {
         writeln!(file, "{}", res.to_string())?;
@@ -68,7 +68,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// TODO: Currently only fasta reader. Consider adding fastq reader. 
+// TODO: Currently only fasta reader. Consider adding fastq reader.
 pub fn open_fasta_file(file_path: &str) -> Result<fasta::Reader<BufReader<BufReader<File>>>, Box<dyn Error>> {
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
