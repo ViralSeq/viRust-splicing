@@ -33,15 +33,15 @@ use tap::Pipe;
     about = "High-performance 🦀Rust🦀-based tool that processes RNA sequencing data with unique molecular identifier (UMI) to identify and quantify complex HIV splicing patterns."
 )]
 pub struct InputConfig {
-    #[arg(long, required = true)]
+    #[arg(short, long, required = true)]
     pub query: String,
-    #[arg(long, required = true)]
+    #[arg(short, long, required = true)]
     pub distance: u8,
-    #[arg(long, required = true)]
+    #[arg(short = '1', long = "file1", required = true)]
     pub filename_r1: String,
-    #[arg(long, required = true)]
+    #[arg(short = '2', long = "file2", required = true)]
     pub filename_r2: String,
-    #[arg(long, required = true, value_enum)]
+    #[arg(short = 'a', long = "assay", required = true, value_enum)]
     pub assay_type: SpliceAssayType,
     // pub output_path: String,
 }
@@ -384,27 +384,41 @@ mod tests {
             "Expected an error, but parsing succeeded"
         );
 
-        let valid_args = InputConfig::try_parse_from([
+        let valid_long_args = InputConfig::try_parse_from([
             "virust-splicing",
             "--query",
             "nl43",
             "--distance",
             "10",
-            "--filename-r1",
+            "--file1",
             "./sim_data/mockseq_r1.fasta",
-            "--filename-r2",
+            "--file2",
             "./sim_data/mockseq_r2.fasta",
-            "--assay-type",
+            "--assay",
             "random-reverse",
         ]);
 
-        if let Err(e) = valid_args {
-            eprintln!("Error parsing arguments: {}", e);
-            panic!("Failed to parse valid arguments");
-        }
+        assert!(
+            valid_long_args.is_ok(),
+            "Expected success, but parsing failed with error"
+        );
+
+        let valid_short_args = InputConfig::try_parse_from([
+            "virust-splicing",
+            "-q",
+            "nl43",
+            "-d",
+            "10",
+            "-1",
+            "./sim_data/mockseq_r1.fasta",
+            "-2",
+            "./sim_data/mockseq_r2.fasta",
+            "-a",
+            "random-reverse",
+        ]);
 
         assert!(
-            valid_args.is_ok(),
+            valid_short_args.is_ok(),
             "Expected success, but parsing failed with error"
         );
     }
