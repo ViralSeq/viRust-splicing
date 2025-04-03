@@ -14,22 +14,34 @@
 //! This module also includes test cases to verify correct behavior of configuration logic.
 
 use crate::open_fasta_file;
+use clap::{Parser, ValueEnum};
 use config::Config;
 use std::collections::HashMap;
-use std::env;
 use std::error::Error;
+use std::path::Path;
 use std::process;
 use tap::Pipe;
 
 ///
 /// Configuration parsed from CLI input arguments for initiating the splicing pipeline.
 ///TODO: Add output path
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Parser)]
+///TODO review name/about information below.  Can reimplement version information from ENV here if we start using versioning
+#[command(
+    name = "viRust-splicing",
+    version = "1.0",
+    about = "High-performance 🦀Rust🦀-based tool that processes RNA sequencing data with unique molecular identifier (UMI) to identify and quantify complex HIV splicing patterns."
+)]
 pub struct InputConfig {
+    #[arg(short, long, required = true)]
     pub query: String,
+    #[arg(short, long, required = true)]
     pub distance: u8,
+    #[arg(short = '1', long = "file1", required = true)]
     pub filename_r1: String,
+    #[arg(short = '2', long = "file2", required = true)]
     pub filename_r2: String,
+    #[arg(short = 'a', long = "assay", required = true, value_enum)]
     pub assay_type: SpliceAssayType,
     // pub output_path: String,
 }
@@ -72,7 +84,7 @@ pub struct SpliceStep {
 
 ///
 /// Enum for the type of assay used in splicing analysis.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, ValueEnum)]
 pub enum SpliceAssayType {
     RandomReverse,
     KMer,
@@ -97,47 +109,22 @@ impl InputConfig {
     }
     ///
     /// Parses command-line arguments into an `InputConfig` structure.
-    /// TODO: Add more detailed argument parsing and validation. Consider using a library like `clap`.
     /// TODO: Output config to a file
     ///
     /// # Errors
     /// Returns an error if the arguments are malformed or invalid.
     pub fn build() -> Result<InputConfig, Box<dyn Error>> {
-        let args: Vec<String> = env::args().collect();
-        if args.len() != 6 {
-            return Err("Wrong number of Arguments\n Usage: cargo run <query_tag> <distance> <assay> <r1_file_path> <r1_file_path>".into());
+        let input_config: InputConfig = InputConfig::parse();
+
+        if Path::new(&input_config.filename_r1).exists() == false {
+            return Err(format!("File {} does not exist", input_config.filename_r1).into());
         }
 
-        let query = args[1].clone();
+        if Path::new(&input_config.filename_r2).exists() == false {
+            return Err(format!("File {} does not exist", input_config.filename_r2).into());
+        }
 
-        let distance = 0;
-
-        match args[2].parse::<u8>() {
-            Ok(distance) => distance,
-            Err(_) => {
-                return Err("Distance must be a number".into());
-            }
-        };
-
-        let assay_type = match args[3].as_str() {
-            "random_reverse" => SpliceAssayType::RandomReverse,
-            "kmer" => SpliceAssayType::KMer,
-            "size_specific" => SpliceAssayType::SizeSpecific,
-            _ => {
-                return Err("Assay type must be random_reverse, kmer or size_specific".into());
-            }
-        };
-
-        let filename_r1 = args[4].clone();
-        let filename_r2 = args[5].clone();
-
-        Ok(InputConfig {
-            query,
-            distance,
-            assay_type,
-            filename_r1,
-            filename_r2,
-        })
+        Ok(input_config)
     }
 }
 
@@ -320,6 +307,7 @@ impl SpliceStep {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_splice_config() {
         let strain = "NL43".to_lowercase().to_string();
@@ -379,5 +367,59 @@ mod tests {
         assert_eq!(splice_steps[2].pattern, "ACGTCCCC".to_string());
         assert_eq!(splice_steps[2].donor, "D1".to_string());
         assert_eq!(splice_steps[2].acceptor, "A3".to_string());
+    }
+
+    #[test]
+    fn test_args() {
+        let invalid_reponse_missing_args = InputConfig::try_parse_from([
+            "virust-splicing",
+            "--query",
+            "nl43",
+            "--assay-type",
+            "reverse",
+        ]);
+
+        assert!(
+            invalid_reponse_missing_args.is_err(),
+            "Expected an error, but parsing succeeded"
+        );
+
+        let valid_long_args = InputConfig::try_parse_from([
+            "virust-splicing",
+            "--query",
+            "nl43",
+            "--distance",
+            "10",
+            "--file1",
+            "./sim_data/mockseq_r1.fasta",
+            "--file2",
+            "./sim_data/mockseq_r2.fasta",
+            "--assay",
+            "random-reverse",
+        ]);
+
+        assert!(
+            valid_long_args.is_ok(),
+            "Expected success, but parsing failed with error"
+        );
+
+        let valid_short_args = InputConfig::try_parse_from([
+            "virust-splicing",
+            "-q",
+            "nl43",
+            "-d",
+            "10",
+            "-1",
+            "./sim_data/mockseq_r1.fasta",
+            "-2",
+            "./sim_data/mockseq_r2.fasta",
+            "-a",
+            "random-reverse",
+        ]);
+
+        assert!(
+            valid_short_args.is_ok(),
+            "Expected success, but parsing failed with error"
+        );
     }
 }
