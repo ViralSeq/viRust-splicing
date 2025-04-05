@@ -27,6 +27,7 @@ static CONFIG: LazyLock<InputConfig> = LazyLock::new(|| InputConfig {
     filename_r1: "sim_data/mockseq_r1.fasta".to_string(),
     filename_r2: "sim_data/mockseq_r2.fasta".to_string(),
     assay_type: SpliceAssayType::RandomReverse, // Kmer and SizeSpecific are about 5 times faster than random reverse.
+    output_path: None,
 });
 
 fn bench_fasta_reader() {

@@ -9,6 +9,7 @@ use std::path::Path;
 
 pub mod config;
 pub mod joined_umi_sequence;
+pub mod ref_sequence;
 pub mod splice_events;
 pub mod umi;
 
@@ -42,7 +43,8 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let splice_config = SpliceConfig::build_from_input(config)?;
 
-    // dbg!(&splice_config);
+    #[cfg(debug_assertions)]
+    dbg!(&splice_config);
 
     let splice_events: Vec<_> = records
         .par_iter()
@@ -62,7 +64,8 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
         })
         .collect();
 
-    // dbg!(println!("{:#?}", splice_events));
+    #[cfg(debug_assertions)]
+    dbg!(println!("{:#?}", splice_events));
 
     // TODO: efficiency test needed
     let splice_events_with_umi_family = find_umi_family_from_events(splice_events);

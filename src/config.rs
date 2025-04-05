@@ -13,14 +13,13 @@
 //!
 //! This module also includes test cases to verify correct behavior of configuration logic.
 
-use crate::open_fasta_file;
+use crate::ref_sequence::get_ref_seq_from_map;
 use clap::{Parser, ValueEnum};
 use config::Config;
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
 use std::process;
-use tap::Pipe;
 
 ///
 /// Configuration parsed from CLI input arguments for initiating the splicing pipeline.
@@ -71,9 +70,8 @@ pub struct SpliceConfig {
 
 ///
 /// Path to the TOML configuration file specifying splice form definitions.
-pub const SPICE_FORM_CONFIG: &str = "data/splice_form_config.toml";
+pub const SPICE_FORM_CONFIG_STR: &str = include_str!("../data/splice_form_config.toml");
 
-///
 /// Represents a splicing step with donor, acceptor, and the combined sequence pattern.
 #[derive(Debug)]
 pub struct SpliceStep {
@@ -229,45 +227,39 @@ impl SpliceConfig {
 
         let seventh_step = SpliceStep::build("D3", d3_unspliced_a3_a7, &query_list);
 
-        let strain_file_name = format!("data/{}.fasta", strain.to_lowercase());
+        let full_length_sequence = get_ref_seq_from_map(&strain.to_ascii_lowercase())
+            .ok_or_else(|| format!("Strain {} not found in config file", strain))?
+            .to_string();
 
-        let fasta_reader = open_fasta_file(&strain_file_name)?;
+        let d4_breakpoint_position = query_list
+            .get("D4_breakpoint_position")
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+        let a7_breakpoint_position = query_list
+            .get("A7_breakpoint_position")
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
 
-        if let Some(record) = fasta_reader.records().next() {
-            let record = record?;
-            let full_length_sequence = record.seq().to_vec().pipe(String::from_utf8).unwrap();
-            let d4_breakpoint_position = query_list
-                .get("D4_breakpoint_position")
-                .unwrap()
-                .parse::<usize>()
-                .unwrap();
-            let a7_breakpoint_position = query_list
-                .get("A7_breakpoint_position")
-                .unwrap()
-                .parse::<usize>()
-                .unwrap();
-
-            Ok(SpliceConfig {
-                strain,
-                splice_assay_type,
-                distance,
-                query_list,
-                d1,
-                d2,
-                d2b,
-                d2b_unspliced,
-                d3,
-                d1_to_all: second_step,
-                d2_to_all: fourth_step,
-                d2b_to_all: fifth_step,
-                d3_to_all: seventh_step,
-                full_length_sequence,
-                d4_breakpoint_position,
-                a7_breakpoint_position,
-            })
-        } else {
-            Err("No record found in fasta file".into())
-        }
+        Ok(SpliceConfig {
+            strain,
+            splice_assay_type,
+            distance,
+            query_list,
+            d1,
+            d2,
+            d2b,
+            d2b_unspliced,
+            d3,
+            d1_to_all: second_step,
+            d2_to_all: fourth_step,
+            d2b_to_all: fifth_step,
+            d3_to_all: seventh_step,
+            full_length_sequence,
+            d4_breakpoint_position,
+            a7_breakpoint_position,
+        })
     }
 
     ///
@@ -285,10 +277,14 @@ pub fn from_splice_form_file_to_hashmap(
     strain: &str,
 ) -> Result<HashMap<String, String>, Box<dyn Error>> {
     let splice_form_config: HashMap<String, HashMap<String, String>> = Config::builder()
-        .add_source(config::File::with_name(SPICE_FORM_CONFIG))
+        .add_source(config::File::from_str(
+            SPICE_FORM_CONFIG_STR,
+            config::FileFormat::Toml,
+        ))
         .build()?
         .try_deserialize::<HashMap<String, HashMap<String, String>>>()?;
-
+    #[cfg(debug_assertions)]
+    dbg!(&splice_form_config);
     let query_list = splice_form_config
         .get(strain)
         .unwrap_or_else(|| {
@@ -296,7 +292,8 @@ pub fn from_splice_form_file_to_hashmap(
             process::exit(1);
         })
         .clone();
-
+    #[cfg(debug_assertions)]
+    dbg!(&query_list);
     Ok(query_list)
 }
 

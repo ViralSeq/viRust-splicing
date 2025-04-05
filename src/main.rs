@@ -19,7 +19,8 @@ fn main() {
         );
         process::exit(1);
     });
-
+    #[cfg(debug_assertions)]
+    dbg!(&config);
     if let Err(e) = virust_splicing::run(config) {
         eprintln!("Application error: {}", e.to_string().red().bold());
         process::exit(1);
