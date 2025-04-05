@@ -5,6 +5,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Write;
+use std::path::Path;
 
 pub mod config;
 pub mod joined_umi_sequence;
@@ -25,6 +26,10 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let fasta_reader_r1 = open_fasta_file(r1_file_path)?;
     let fasta_reader_r2 = open_fasta_file(r2_file_path)?;
+
+    let output_path_str = &config.output_path.clone().unwrap();
+    let output_path = Path::new(output_path_str);
+    let output_tsv_file = output_path.join("output.tsv");
 
     // collect records
     let records: Result<Vec<_>, Box<dyn Error>> = fasta_reader_r1
@@ -62,7 +67,13 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     // TODO: efficiency test needed
     let splice_events_with_umi_family = find_umi_family_from_events(splice_events);
 
-    let mut file = File::create("output.tsv")?; //TODO: consider letting user specify output file
+    let mut file = File::create(&output_tsv_file)?;
+    println!(
+        "Writing output to: {}",
+        output_tsv_file
+            .to_str()
+            .unwrap_or("Error converting path to string...")
+    );
     writeln!(
         file,
         "sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category"

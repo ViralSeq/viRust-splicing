@@ -24,7 +24,6 @@ use tap::Pipe;
 
 ///
 /// Configuration parsed from CLI input arguments for initiating the splicing pipeline.
-///TODO: Add output path
 #[derive(Debug, Clone, Parser)]
 ///TODO review name/about information below.  Can reimplement version information from ENV here if we start using versioning
 #[command(
@@ -43,7 +42,8 @@ pub struct InputConfig {
     pub filename_r2: String,
     #[arg(short = 'a', long = "assay", required = true, value_enum)]
     pub assay_type: SpliceAssayType,
-    // pub output_path: String,
+    #[arg(long = "output", short = 'o', required = false)]
+    pub output_path: Option<String>,
 }
 
 ///
@@ -98,6 +98,7 @@ impl InputConfig {
         assay_type: SpliceAssayType,
         filename_r1: String,
         filename_r2: String,
+        output_path: Option<String>,
     ) -> Self {
         InputConfig {
             query,
@@ -105,16 +106,16 @@ impl InputConfig {
             assay_type,
             filename_r1,
             filename_r2,
+            output_path,
         }
     }
     ///
     /// Parses command-line arguments into an `InputConfig` structure.
-    /// TODO: Output config to a file
     ///
     /// # Errors
     /// Returns an error if the arguments are malformed or invalid.
     pub fn build() -> Result<InputConfig, Box<dyn Error>> {
-        let input_config: InputConfig = InputConfig::parse();
+        let mut input_config: InputConfig = InputConfig::parse();
 
         if Path::new(&input_config.filename_r1).exists() == false {
             return Err(format!("File {} does not exist", input_config.filename_r1).into());
@@ -122,6 +123,31 @@ impl InputConfig {
 
         if Path::new(&input_config.filename_r2).exists() == false {
             return Err(format!("File {} does not exist", input_config.filename_r2).into());
+        }
+
+        // If output path is set, then ensure it's not a file
+        //    and create the directory if it does not exist
+        // Else set output_path to filename_r1 directory
+        if let Some(ref path) = input_config.output_path {
+            let path_obj = Path::new(path);
+
+            if path_obj.is_file() {
+                return Err(format!("Output path is a file, please use a valid directory").into());
+            }
+
+            if !path_obj.exists() {
+                std::fs::create_dir_all(path_obj)?;
+            }
+        } else {
+            let r1_path = input_config.filename_r1.clone();
+            let default_output_path = Path::new(&r1_path).parent().unwrap();
+
+            let output_path: String = default_output_path
+                .to_str()
+                .ok_or("Failed to convert output directory path to string")?
+                .to_string();
+
+            input_config.output_path = Some(output_path);
         }
 
         Ok(input_config)
