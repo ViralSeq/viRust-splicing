@@ -21,7 +21,6 @@ use std::error::Error;
 use std::path::Path;
 use std::process;
 
-///
 /// Configuration parsed from CLI input arguments for initiating the splicing pipeline.
 #[derive(Debug, Clone, Parser)]
 ///TODO review name/about information below.  Can reimplement version information from ENV here if we start using versioning
@@ -32,7 +31,7 @@ use std::process;
 )]
 pub struct InputConfig {
     #[arg(short, long, required = true)]
-    pub query: String,
+    pub query: String, // strain name, e.g., NL43
     #[arg(short, long, required = true)]
     pub distance: u8,
     #[arg(short = '1', long = "file1", required = true)]
@@ -166,7 +165,7 @@ impl SpliceConfig {
         distance: u8,
         splice_assay_type: SpliceAssayType,
     ) -> Result<SpliceConfig, Box<dyn Error>> {
-        let query_list = from_splice_form_file_to_hashmap(&strain)?;
+        let query_list = from_splice_form_file_to_hashmap(&strain.to_lowercase())?;
 
         // first step check D1
         let d1 = query_list.get("D1").unwrap().clone();
@@ -228,7 +227,9 @@ impl SpliceConfig {
         let seventh_step = SpliceStep::build("D3", d3_unspliced_a3_a7, &query_list);
 
         let full_length_sequence = get_ref_seq_from_map(&strain.to_ascii_lowercase())
-            .ok_or_else(|| format!("Strain {} not found in config file", strain))?
+            //.ok_or_else(|| format!("Strain {} not found in config file", strain))?
+            .or(get_ref_seq_from_map("nl43")) // default to NL43 if strain not found
+            .ok_or("Reference sequence not found")?
             .to_string();
 
         let d4_breakpoint_position = query_list

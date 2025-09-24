@@ -62,6 +62,8 @@ pub struct SpliceEvents {
 }
 
 /// MARK: SpliceChain
+/// Represents a chain of splicing events.
+/// for example: D1_A1_D2_A2_D3_A3 (the struct itself is a vector of strings, but can be joined by _ to make a string)
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct SpliceChain {
     pub splice_event: Vec<String>,

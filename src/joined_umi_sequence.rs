@@ -198,16 +198,27 @@ fn process_splice_rec<'a>(
                 process_splice_rec(new_seq, chain, config, 2)
             } else {
                 chain.add_splice_event("noD1".to_string());
+
+                //TODO: We need to continue searching for acceptors even if D1 is not found.
+                //If we find an acceptor, we should output the sequence before the acceptor for futher inspection.
+                //And we need to map these D1 alternative donors on the sequence map.
                 seq
             }
         }
         // Stage 2: Process the acceptor immediately after D1.
         2 => {
-            // println!("step 2");
-            // println!("chain: {:?}", chain);
-            // println!("seq: {:?}", seq.to_vec().pipe(String::from_utf8));
-            // println!("config.d1_to_all: {:?}", config.d1_to_all);
-            // println!("distance: {:?}", distance);
+            #[cfg(debug_assertions)]
+            dbg!("step 2");
+            dbg!("chain: {:?}", &chain);
+            dbg!(
+                "seq: {:?}",
+                seq.to_vec()
+                    .pipe(String::from_utf8)
+                    .unwrap_or_else(|e| format!("Invalid UTF-8: {:?}", e))
+            );
+            dbg!("config.d1_to_all: {:?}", &config.d1_to_all);
+            dbg!("distance: {:?}", distance);
+
             if let Some((acc, new_seq)) =
                 pattern_search_trim_seq_batch(seq, &config.d1_to_all, distance)
             {
@@ -219,6 +230,8 @@ fn process_splice_rec<'a>(
                 }
             } else {
                 chain.add_splice_event("unknown".to_string());
+
+                //TODO: Need to know what sequence is left here for futher inspection.
                 seq
             }
         }

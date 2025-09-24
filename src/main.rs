@@ -3,9 +3,7 @@ use std::process;
 
 use virust_splicing::config::InputConfig;
 
-// TODO: Intergrated test needed.
 fn main() {
-    //TODO: Add a help message to the config struct.
     println!(
         "{}",
         "ViRust-Splicing for processing HIV splicing data.\n Placeholder for more information."
