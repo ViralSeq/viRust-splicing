@@ -1,4 +1,4 @@
-use bio::io::fasta;
+use bio::io::fasta::{self, Record};
 use rayon::prelude::*;
 use splice_events::find_umi_family_from_events;
 use std::error::Error;
@@ -30,16 +30,28 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let output_path_str = &config.output_path.clone().unwrap();
     let output_path = Path::new(output_path_str);
-    let output_tsv_file = output_path.join("output.tsv");
+    let file_name = "output".to_owned()
+        + "_strain_"
+        + &config.query
+        + "_distance_"
+        + &config.distance.to_string()
+        + "_assay_"
+        + &config.assay_type.to_string()
+        + ".tsv";
+    let output_tsv_file = output_path.join(file_name);
 
     // collect records
-    let records: Result<Vec<_>, Box<dyn Error>> = fasta_reader_r1
+    // need to add homopolymer check here.
+    // records with homopolymer (10 or more) in the either of the paired R1 or R2 will be skipped.
+    let records: Vec<(Record, Record)> = fasta_reader_r1
         .records()
         .zip(fasta_reader_r2.records())
-        .map(|(r1, r2)| Ok((r1?, r2?)))
-        .collect();
-
-    let records = records?;
+        .map(|(r1_res, r2_res)| {
+            let r1 = r1_res?;
+            let r2 = r2_res?;
+            Ok::<_, Box<dyn Error>>((r1, r2))
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
 
     let splice_config = SpliceConfig::build_from_input(config)?;
 
@@ -48,6 +60,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let splice_events: Vec<_> = records
         .par_iter()
+        .filter(|(r1, r2)| !(homopolymer_check(r1.seq()) || homopolymer_check(r2.seq())))
         .map(|(r1_record, r2_record)| {
             let mut joined_umi_sequence = joined_umi_sequence::JoinedUmiSequnce::from_fasta_record(
                 &r1_record,
@@ -79,7 +92,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     );
     writeln!(
         file,
-        "sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category"
+        "sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category\talternative_d1_used\tunknown_sequence_after_d1"
     )?;
     for res in splice_events_with_umi_family.iter() {
         writeln!(file, "{}", res.to_string())?;
@@ -97,6 +110,25 @@ pub fn open_fasta_file(
     Ok(fasta::Reader::new(reader))
 }
 
+fn homopolymer_check(seq: &[u8]) -> bool {
+    let max_homopolymer_length = 10; // TODO consider moving to master config
+    let mut current_char = 0;
+    let mut current_count = 0;
+
+    for &c in seq {
+        if c == current_char {
+            current_count += 1;
+            if current_count > max_homopolymer_length {
+                return true; // Found a homopolymer longer than the threshold
+            }
+        } else {
+            current_char = c;
+            current_count = 1;
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,5 +143,13 @@ mod tests {
         let sequence = record.seq().to_vec();
         let aln = pattern_search(&sequence, pattern, 2).unwrap();
         assert_eq!((aln.ystart, aln.yend, aln.score), (4913, 4947, 0));
+    }
+
+    #[test]
+    fn test_homopolymer_check() {
+        let seq_with_homopolymer = b"AAACCCCTTTTTTTTTTTTGGG";
+        let seq_without_homopolymer = b"AAACCCCTTTTGGG";
+        assert!(homopolymer_check(seq_with_homopolymer));
+        assert!(!homopolymer_check(seq_without_homopolymer));
     }
 }

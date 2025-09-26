@@ -11,7 +11,7 @@
 //! processing and splice event detection.
 
 use crate::config::{SpliceConfig, SpliceStep};
-use crate::splice_events::{SpliceChain, SpliceEvents};
+use crate::splice_events::{ProcessedSpliceRec, SpliceChain, SpliceEvents};
 use bio::alignment::Alignment;
 use bio::alphabets::dna;
 ///MARK: Library imports
@@ -59,7 +59,7 @@ impl JoinedUmiSequnce {
         forward_n_size: usize,
         umi_size: usize,
     ) -> JoinedUmiSequnce {
-        let sequence_id = record_r1.id()[..(record_r1.id().len() - 3)].to_string();
+        let sequence_id = record_r1.id().to_string();
 
         let forward_seq = record_r1
             .seq()
@@ -96,6 +96,7 @@ impl JoinedUmiSequnce {
     pub fn join(&mut self) {
         let min_overlap = 10; // TODO Minimum overlap length required for merging. Consider moving to master config.
         let error_rate = 0.02; // TODO Maximum error rate allowed in the overlap region. Consider moving to master config.
+
         if let Some(joined) = join_reads(
             &self.forward_sequence,
             &self.reverse_sequence,
@@ -154,9 +155,16 @@ impl JoinedUmiSequnce {
         let seq = seq.as_bytes();
         let mut chain = SpliceChain::new();
         // Start processing at stage 1 (which handles D1).
-        let final_seq = process_splice_rec(seq, &mut chain, splice_config, 1);
+        let initial_splice_rec = ProcessedSpliceRec::init(seq);
+        let final_processed_splice_rec =
+            process_splice_rec(initial_splice_rec, &mut chain, splice_config, 1);
+        let final_seq = final_processed_splice_rec.seq;
+        let alternative_d1 = final_processed_splice_rec.alternative_d1;
+        let unknown_sequence_after_d1 = final_processed_splice_rec.unknown_sequence_after_d1;
         let mut event = SpliceEvents::from_joined_umi_with_event(self, chain);
         event.add_post_splice_sequence(String::from_utf8(final_seq.to_vec())?);
+        event.add_alternative_d1(alternative_d1);
+        event.add_unknown_sequence_after_d1(unknown_sequence_after_d1);
         event.find_size_class(splice_config)?;
         // println!("Splice events: {:?}", event.size_class);
         event.predict_final_category();
@@ -183,133 +191,214 @@ impl JoinedUmiSequnce {
 ///
 /// # Returns
 /// The remaining sequence after processing.
+/// TODO！Fix all the issues and complete the TODOs in this function.
 fn process_splice_rec<'a>(
-    seq: &'a [u8],
+    splice_rec: ProcessedSpliceRec<'a>,
     chain: &mut SpliceChain,
     config: &SpliceConfig,
     stage: u8,
-) -> &'a [u8] {
+) -> ProcessedSpliceRec<'a> {
     let distance = config.distance;
     match stage {
         // Stage 1: Process D1.
         1 => {
-            if let Some(new_seq) = pattern_search_trim_seq(seq, config.d1.as_bytes(), distance) {
+            if let Some(new_seq) =
+                pattern_search_trim_seq(splice_rec.seq, config.d1.as_bytes(), distance)
+            {
                 chain.add_splice_event("D1".to_string());
-                process_splice_rec(new_seq, chain, config, 2)
+                process_splice_rec(ProcessedSpliceRec::init(new_seq), chain, config, 2)
             } else {
                 chain.add_splice_event("noD1".to_string());
 
                 //TODO: We need to continue searching for acceptors even if D1 is not found.
                 //If we find an acceptor, we should output the sequence before the acceptor for futher inspection.
                 //And we need to map these D1 alternative donors on the sequence map.
-                seq
+                process_splice_rec(splice_rec, chain, config, 8) // Jump to stage 8 to search for acceptors without D1. And find out what is the alternative donor.
             }
         }
         // Stage 2: Process the acceptor immediately after D1.
         2 => {
-            #[cfg(debug_assertions)]
-            dbg!("step 2");
-            dbg!("chain: {:?}", &chain);
-            dbg!(
-                "seq: {:?}",
-                seq.to_vec()
-                    .pipe(String::from_utf8)
-                    .unwrap_or_else(|e| format!("Invalid UTF-8: {:?}", e))
-            );
-            dbg!("config.d1_to_all: {:?}", &config.d1_to_all);
-            dbg!("distance: {:?}", distance);
-
             if let Some((acc, new_seq)) =
-                pattern_search_trim_seq_batch(seq, &config.d1_to_all, distance)
+                pattern_search_trim_seq_batch(splice_rec.seq, &config.d1_to_all, distance)
             {
                 chain.add_splice_event(acc.clone());
+
+                let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                    new_seq,
+                    splice_rec.alternative_d1,
+                    splice_rec.unknown_sequence_after_d1,
+                );
                 match acc.as_str() {
-                    "A1" => process_splice_rec(new_seq, chain, config, 3),
-                    "A2" => process_splice_rec(new_seq, chain, config, 5),
-                    _ => new_seq,
+                    "A1" => process_splice_rec(new_splice_rec, chain, config, 3),
+                    "A2" => process_splice_rec(new_splice_rec, chain, config, 5),
+                    _ => new_splice_rec,
                 }
             } else {
                 chain.add_splice_event("unknown".to_string());
 
-                //TODO: Need to know what sequence is left here for futher inspection.
-                seq
+                //Need to know what sequence is left here for futher inspection.
+                //Export the unknown sequence to the field of unknown_sequence_after_d1 in SpliceEvents struct.
+                //may only need to keep up to 15 bases
+
+                let query_length = splice_rec.seq.len().min(15); // Limit to the first 15 bases, if the query sequence is shorter, take all of it.
+                if query_length > 0 {
+                    let unknown_sequence_after_d1 = Some(&splice_rec.seq[..query_length]);
+
+                    ProcessedSpliceRec::init_with_option_fields(
+                        splice_rec.seq,
+                        splice_rec.alternative_d1,
+                        unknown_sequence_after_d1,
+                    )
+                } else {
+                    splice_rec
+                }
             }
         }
         // Stage 3: Process D2 (for the A1 branch).
         3 => {
-            if let Some(new_seq) = pattern_search_trim_seq(seq, config.d2.as_bytes(), distance) {
+            if let Some(new_seq) =
+                pattern_search_trim_seq(splice_rec.seq, config.d2.as_bytes(), distance)
+            {
                 chain.add_splice_event("D2".to_string());
-                process_splice_rec(new_seq, chain, config, 4)
+                let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                    new_seq,
+                    splice_rec.alternative_d1,
+                    splice_rec.unknown_sequence_after_d1,
+                );
+                process_splice_rec(new_splice_rec, chain, config, 4)
             } else {
                 chain.add_splice_event("noD2".to_string());
-                seq
+                splice_rec
             }
         }
         // Stage 4: Process acceptor after D2.
         4 => {
             if let Some((acc, new_seq)) =
-                pattern_search_trim_seq_batch(seq, &config.d2_to_all, distance)
+                pattern_search_trim_seq_batch(splice_rec.seq, &config.d2_to_all, distance)
             {
                 chain.add_splice_event(acc.clone());
+                let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                    new_seq,
+                    splice_rec.alternative_d1,
+                    splice_rec.unknown_sequence_after_d1,
+                );
                 match acc.as_str() {
-                    "D2-unspliced" => process_splice_rec(new_seq, chain, config, 6),
-                    "A2" => process_splice_rec(new_seq, chain, config, 5),
-                    _ => new_seq,
+                    "D2-unspliced" => process_splice_rec(new_splice_rec, chain, config, 6),
+                    "A2" => process_splice_rec(new_splice_rec, chain, config, 5),
+                    _ => new_splice_rec,
                 }
             } else {
                 chain.add_splice_event("unknown".to_string());
-                seq
+                splice_rec
             }
         }
         // Stage 5: Process D3 branch (common for any A2 outcome).
         5 => {
-            if let Some(new_seq) = pattern_search_trim_seq(seq, config.d3.as_bytes(), distance) {
+            if let Some(new_seq) =
+                pattern_search_trim_seq(splice_rec.seq, config.d3.as_bytes(), distance)
+            {
                 chain.add_splice_event("D3".to_string());
-                process_splice_rec(new_seq, chain, config, 7)
+                let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                    new_seq,
+                    splice_rec.alternative_d1,
+                    splice_rec.unknown_sequence_after_d1,
+                );
+                process_splice_rec(new_splice_rec, chain, config, 7)
             } else {
                 chain.add_splice_event("noD3".to_string());
-                seq
+                splice_rec
             }
         }
         // Stage 6: Process D2b for the "D2-unspliced" branch.
         6 => {
-            if let Some(new_seq) = pattern_search_trim_seq(seq, config.d2b.as_bytes(), distance) {
+            if let Some(new_seq) =
+                pattern_search_trim_seq(splice_rec.seq, config.d2b.as_bytes(), distance)
+            {
                 chain.add_splice_event("D2b".to_string());
                 if let Some((acc, new_seq2)) =
                     pattern_search_trim_seq_batch(new_seq, &config.d2b_to_all, distance)
                 {
                     chain.add_splice_event(acc.clone());
+                    let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                        new_seq2,
+                        splice_rec.alternative_d1,
+                        splice_rec.unknown_sequence_after_d1,
+                    );
+
                     if acc == "A2" {
-                        process_splice_rec(new_seq2, chain, config, 5)
+                        process_splice_rec(new_splice_rec, chain, config, 5)
                     } else {
-                        new_seq2
+                        new_splice_rec
                     }
                 } else {
                     chain.add_splice_event("unknown".to_string());
-                    seq
+                    ProcessedSpliceRec::init_with_option_fields(
+                        new_seq,
+                        splice_rec.alternative_d1,
+                        splice_rec.unknown_sequence_after_d1,
+                    )
                 }
             } else {
                 chain.add_splice_event("noD2b".to_string());
-                seq
+                splice_rec
             }
         }
         // Stage 7: Process the acceptor downstream of D3.
         7 => {
-            // println!("step 7");
-            // println!("chain: {:?}", chain);
-            // println!("seq: {:?}", seq.to_vec().pipe(String::from_utf8));
-            // println!("config.d3_to_all: {:?}", config.d3_to_all);
             if let Some((acc, new_seq)) =
-                pattern_search_trim_seq_batch(seq, &config.d3_to_all, distance)
+                pattern_search_trim_seq_batch(splice_rec.seq, &config.d3_to_all, distance)
             {
                 chain.add_splice_event(acc.clone());
-                new_seq
+                let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                    new_seq,
+                    splice_rec.alternative_d1,
+                    splice_rec.unknown_sequence_after_d1,
+                );
+                new_splice_rec
             } else {
                 chain.add_splice_event("unknown".to_string());
-                seq
+                splice_rec
             }
         }
-        _ => seq,
+        // Stage 8: Search for acceptors without D1 (for sequences missing D1).
+        8 => {
+            // "Need to know what sequence is left here for further inspection.
+            // First thing would be redo the search function. The current search function will return trimmed the sequence.
+            // But we want to export the leading sequence before the acceptor for further inspection.
+            // It will export to the field of pre_splice_sequence in SpliceEvents struct."
+            // in this step we we force the mistatch distance to be 1, because we want to find exact matches only.
+
+            if let Some(matched_pattern) = pattern_search_trim_seq_with_donor_batch(
+                splice_rec.seq,
+                &config.alternative_d1_to_all,
+                1,
+            ) {
+                // If we find an acceptor, we should output the sequence before the acceptor for further inspection.
+                let acc = matched_pattern.acceptor_name.unwrap();
+                let new_seq = matched_pattern.trimmed_sequence;
+                let alternative_d1 = matched_pattern.donor_sequence;
+                chain.add_splice_event(acc.clone());
+                let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                    new_seq,
+                    Some(alternative_d1),
+                    splice_rec.unknown_sequence_after_d1,
+                );
+                match acc.as_str() {
+                    "A1" => process_splice_rec(new_splice_rec, chain, config, 3),
+                    "A2" => process_splice_rec(new_splice_rec, chain, config, 5),
+                    "gag-AUG" => {
+                        // If we find intact gag-AUG (unspliced), we consider it as unspliced and stop further searching.
+                        chain.add_splice_event("unspliced".to_string());
+                        new_splice_rec
+                    }
+                    _ => new_splice_rec,
+                }
+            } else {
+                chain.add_splice_event("no-acceptor".to_string());
+                splice_rec
+            }
+        }
+        _ => splice_rec,
     }
 }
 
@@ -414,7 +503,7 @@ pub fn pattern_search(sequence: &[u8], pattern: &[u8], distance: u8) -> Option<A
     }
 }
 
-/// Searches for a pattern in a sequence and trims the sequence up to the match.
+/// Searches for a pattern in a sequence and trims the sequence up to the match, aka, removing everything before the pattern, but retaining the pattern and everything after it.
 ///
 /// # Arguments
 /// * `sequence` - The sequence to search.
@@ -437,6 +526,44 @@ pub fn pattern_search_trim_seq<'a>(
             lazy_matches.alignment_at(best_end, &mut aln);
 
             Some(&sequence[aln.ystart..])
+        }
+        None => None,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MatchedPattern<'a> {
+    pub acceptor_name: Option<String>, // Name of the matched acceptor, if applicable
+    pub donor_sequence: &'a [u8],
+    pub trimmed_sequence: &'a [u8],
+}
+
+pub fn pattern_search_trim_with_donor<'a>(
+    sequence: &'a [u8],
+    pattern: &[u8],
+    distance: u8,
+) -> Option<MatchedPattern<'a>> {
+    let mut aln = Alignment::default();
+    let mut myers = myers::Myers::<u64>::new(pattern);
+    let mut lazy_matches = myers.find_all_lazy(sequence, distance);
+
+    match lazy_matches.by_ref().min_by_key(|&(_, dist)| dist) {
+        Some((best_end, _)) => {
+            lazy_matches.alignment_at(best_end, &mut aln);
+
+            let mut donor_sequence = &sequence[..aln.ystart];
+            let trimmed_sequence = &sequence[aln.ystart..];
+
+            // only keep up to 15 bases of donor sequence
+            if donor_sequence.len() > 15 {
+                donor_sequence = &donor_sequence[donor_sequence.len() - 15..];
+            }
+
+            Some(MatchedPattern {
+                acceptor_name: None, // Placeholder, can be set if needed
+                donor_sequence,
+                trimmed_sequence,
+            })
         }
         None => None,
     }
@@ -468,9 +595,29 @@ pub fn pattern_search_trim_seq_batch<'a>(
     None
 }
 
+pub fn pattern_search_trim_seq_with_donor_batch<'a>(
+    sequence: &'a [u8],
+    list: &Vec<SpliceStep>,
+    distance: u8,
+) -> Option<MatchedPattern<'a>> {
+    for step in list {
+        // be careful here, the order of the list matters.
+        let pattern = step.pattern.as_bytes();
+
+        if let Some(matched_pattern) = pattern_search_trim_with_donor(sequence, pattern, distance) {
+            // println!("matched acceptor: {:?}", step.acceptor);
+            let mut matched_pattern = matched_pattern;
+            matched_pattern.acceptor_name = Some(step.acceptor.clone());
+            return Some(matched_pattern);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 
 mod tests {
+
     use super::*;
 
     #[test]
@@ -510,7 +657,55 @@ mod tests {
         let mut joined_umi_sequence = JoinedUmiSequnce::from_fasta_record(&r1, &r2, 4, 14);
         joined_umi_sequence.join();
         assert_eq!(joined_umi_sequence.joined_sequence, Some("TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT".to_string()));
-        assert_eq!(joined_umi_sequence.joined_seq_to_fasta_record(), Some(fasta::Record::with_attrs("seq1-joined", Some("ForwardNs: NNNN, UMI: NNNNNNNNNNNNNN"), b"TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT")));
+        assert_eq!(joined_umi_sequence.joined_seq_to_fasta_record(), Some(fasta::Record::with_attrs("seq1_r1-joined", Some("ForwardNs: NNNN, UMI: NNNNNNNNNNNNNN"), b"TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT")));
         assert_eq!(joined_umi_sequence.find_sequence_for_search(), "TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT".to_string());
+    }
+
+    #[test]
+    fn test_pattern_search() {
+        let sequence = b"TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT";
+        let pattern = b"AGAGATGGAAAAGGAAGGGAAA";
+        let distance = 2;
+        let aln = pattern_search(sequence, pattern, distance);
+        dbg!(&aln);
+        assert!(aln.is_some());
+    }
+
+    #[test]
+    fn test_pattern_search_trim_seq() {
+        let sequence = b"TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT";
+        let pattern = b"AGAGCTGGAAAGGAAGGGAAA";
+        let distance = 2;
+        let trimmed_seq = pattern_search_trim_seq(sequence, pattern, distance);
+        dbg!(&trimmed_seq);
+        assert_eq!(trimmed_seq, Some(b"AGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT".as_ref()));
+
+        let pattern2 = b"AGAGCTGGAAACGAAGGGAAA"; // 3 mismatches, should return None
+        let trimmed_seq2 = pattern_search_trim_seq(sequence, pattern2, distance);
+        dbg!(&trimmed_seq2);
+        assert_eq!(trimmed_seq2, None);
+    }
+
+    #[test]
+    fn test_pattern_search_trim_with_donor() {
+        let sequence = b"TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT";
+        let pattern = b"AGAGATGGAAAAGGAAGGGAAA";
+        let distance = 2;
+        let matched_pattern = pattern_search_trim_with_donor(sequence, pattern, distance);
+        dbg!(&matched_pattern);
+        assert!(matched_pattern.is_some());
+        let matched_pattern = matched_pattern.unwrap();
+        assert_eq!(matched_pattern.donor_sequence, b"AGTAGAAATTTGTAC");
+        assert_eq!(matched_pattern.trimmed_sequence, b"AGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT".as_ref());
+    }
+
+    #[test]
+    fn test_pattern_search_trim_with_donor2() {
+        let seq = b"TTATGAACAGGGACTTGAAAGCGAAAGTAAAGCCAGAGGAGATCTCTCGACGCAGGACTCGGCTTGCTGAAGCGCGCACGGCAAGAGGCGAGGGGCGGCGTTTGACTAGCGGAGGCTAGAAGGAGAGAGATGGAATTGGGTGTCGACATAGCAGAATAGGCGTTACTCGACAGAGGAGAGCAAGAAATGGAGCCAGTAGGTCCTAGACTAGAGCCCTGGAAGCATCCAGGAAGTCAGCCTAAAACTGCTTGTACCAATTGCTATTGTAAAAAGTGTTGCTTCCATTTCCAAGTTTGTTTCA";
+        let pattern = b"AATCTGCTAT";
+        let distance = 0;
+        let matched_pattern = pattern_search_trim_with_donor(seq, pattern, distance);
+        dbg!(&matched_pattern);
+        assert!(matched_pattern.is_none());
     }
 }

@@ -6,8 +6,9 @@ nl43.A7_breakpoint_position = 7625 # first base after A7, position starts with 0
 
 nl43.D1 = "GGGGCGGCGACTG" # HXB2 position 743, last base position
 nl43.D1-unspliced = "GTGAGTACGCC" # HXB2 position 744, first base position
-nl43.A1 = "GGACAGCAGA" # HXB2 position 4913
-nl43.A2 = "AATCTGCTAT" # HXB2 position 5390
+nl43.gag-AUG = "GAGAGATGGGTGC" # HXB2 position starting 785, gag start codon AUG at 797, this sequence spans 785..=797, match unspliced RNA when D1 is not present.
+nl43.A1 = "GGACAGCAGAGATCCA" # HXB2 position 4913
+nl43.A2 = "AATCTGCTATAAGAAA" # HXB2 position 5390
 
 nl43.D2 = "CTCTGGAAAG" # HXB2 position 4962
 nl43.D2-unspliced = "GTGAAGGGGC" # HXB2 position 4963
@@ -16,14 +17,14 @@ nl43.D2b-unspliced = "GTGATGATTG" # HXB2 position 5059
 nl43.D3 = "ACATAACAAG" # HXB2 position 5463
 nl43.D3-unspliced = "GTAGGATCTC" # HXB2 position 5464
 
-nl43.A3 = "AATTGGGTGT" # HXB2 position 5777
-nl43.A4a = "CCTTAGGCAT"  # HXB2 position 5955
-nl43.A4b = "GCATCTCCTA"  # HXB2 position 5961
-nl43.A4c = "TTTGTTTCAT" # HXB2 position 5937
-nl43.A4d = "TGTTGCTTTC" # HXB2 position 5918
-nl43.A5a = "GAAGAAGCGG" # HXB2 position 5977
-nl43.A5b = "AAGCGGAGAC" # HXB2 position 5981
-nl43.A7 = "ACCCACCTCC" # HXB2 position 8379
+nl43.A3 = "AATTGGGTGTCGACAT" # HXB2 position 5777
+nl43.A4a = "CCTTAGGCATCTCCTA"  # HXB2 position 5955
+nl43.A4b = "GCATCTCCTATGGCAG"  # HXB2 position 5961
+nl43.A4c = "TTTGTTTCATGACAA" # HXB2 position 5937
+nl43.A4d = "TGTTGCTTTCATTGC" # HXB2 position 5918
+nl43.A5a = "GAAGAAGCGGAGACAG" # HXB2 position 5977
+nl43.A5b = "AAGCGGAGACAGCGA" # HXB2 position 5981
+nl43.A7 = "ACCCACCTCCCAATC" # HXB2 position 8379
 
 # for strain nl43_t745a
 
@@ -33,8 +34,10 @@ nl43_t745a.A7_breakpoint_position = 7625 # first base after A7, position starts 
 
 nl43_t745a.D1 = "GGGGCGGCGACTG" # HXB2 position 743, last base position
 nl43_t745a.D1-unspliced = "GAGAGTACGCC" # HXB2 position 744, first base position # mutation T745A, which is the 2nd base of this sequence
-nl43_t745a.A1 = "GGACAGCAGA" # HXB2 position 4913
-nl43_t745a.A2 = "AATCTGCTAT" # HXB2 position 5390
+nl43_t745a.gag-AUG = "GAGAGATGGGTGC" # HXB2 position starting 785, gag start codon AUG at 790, this sequence spans 785..=797, match unspliced RNA when D1 is not present.
+
+nl43_t745a.A1 = "GGACAGCAGAGATCCA" # HXB2 position 4913
+nl43_t745a.A2 = "AATCTGCTATAAGAAA" # HXB2 position 5390
 
 nl43_t745a.D2 = "CTCTGGAAAG" # HXB2 position 4962
 nl43_t745a.D2-unspliced = "GTGAAGGGGC" # HXB2 position 4963
@@ -43,14 +46,14 @@ nl43_t745a.D2b-unspliced = "GTGATGATTG" # HXB2 position 5059
 nl43_t745a.D3 = "ACATAACAAG" # HXB2 position 5463
 nl43_t745a.D3-unspliced = "GTAGGATCTC" # HXB2 position 5464
 
-nl43_t745a.A3 = "AATTGGGTGT" # HXB2 position 5777
-nl43_t745a.A4a = "CCTTAGGCAT"  # HXB2 position 5955
-nl43_t745a.A4b = "GCATCTCCTA"  # HXB2 position 5961
-nl43_t745a.A4c = "TTTGTTTCAT" # HXB2 position 5937
-nl43_t745a.A4d = "TGTTGCTTTC" # HXB2 position 5918
-nl43_t745a.A5a = "GAAGAAGCGG" # HXB2 position 5977
-nl43_t745a.A5b = "AAGCGGAGAC" # HXB2 position 5981
-nl43_t745a.A7 = "ACCCACCTCC" # HXB2 position 8379
+nl43_t745a.A3 = "AATTGGGTGTCGACAT" # HXB2 position 5777
+nl43_t745a.A4a = "CCTTAGGCATCTCCTA"  # HXB2 position 5955
+nl43_t745a.A4b = "GCATCTCCTATGGCAG"  # HXB2 position 5961
+nl43_t745a.A4c = "TTTGTTTCATGACAA" # HXB2 position 5937
+nl43_t745a.A4d = "TGTTGCTTTCATTGC" # HXB2 position 5918
+nl43_t745a.A5a = "GAAGAAGCGGAGACAG" # HXB2 position 5977
+nl43_t745a.A5b = "AAGCGGAGACAGCGA" # HXB2 position 5981
+nl43_t745a.A7 = "ACCCACCTCCCAATC" # HXB2 position 8379
 
 # for strain nl43_t745c
 
@@ -60,8 +63,10 @@ nl43_t745c.A7_breakpoint_position = 7625 # first base after A7, position starts 
 
 nl43_t745c.D1 = "GGGGCGGCGACTG" # HXB2 position 743, last base position
 nl43_t745c.D1-unspliced = "GCGAGTACGCC" # HXB2 position 744, first base position # mutation T745C, which is the 2nd base of this sequence
-nl43_t745c.A1 = "GGACAGCAGA" # HXB2 position 4913
-nl43_t745c.A2 = "AATCTGCTAT" # HXB2 position 5390
+nl43_t745c.gag-AUG = "GAGAGATGGGTGC" # HXB2 position starting 785, gag start codon AUG at 790, this sequence spans 785..=797, match unspliced RNA when D1 is not present.
+
+nl43_t745c.A1 = "GGACAGCAGAGATCCA" # HXB2 position 4913
+nl43_t745c.A2 = "AATCTGCTATAAGAAA" # HXB2 position 5390
 
 nl43_t745c.D2 = "CTCTGGAAAG" # HXB2 position 4962
 nl43_t745c.D2-unspliced = "GTGAAGGGGC" # HXB2 position 4963
@@ -70,11 +75,40 @@ nl43_t745c.D2b-unspliced = "GTGATGATTG" # HXB2 position 5059
 nl43_t745c.D3 = "ACATAACAAG" # HXB2 position 5463
 nl43_t745c.D3-unspliced = "GTAGGATCTC" # HXB2 position 5464
 
-nl43_t745c.A3 = "AATTGGGTGT" # HXB2 position 5777
-nl43_t745c.A4a = "CCTTAGGCAT"  # HXB2 position 5955
-nl43_t745c.A4b = "GCATCTCCTA"  # HXB2 position 5961
-nl43_t745c.A4c = "TTTGTTTCAT" # HXB2 position 5937
-nl43_t745c.A4d = "TGTTGCTTTC" # HXB2 position 5918
-nl43_t745c.A5a = "GAAGAAGCGG" # HXB2 position 5977
-nl43_t745c.A5b = "AAGCGGAGAC" # HXB2 position 5981
-nl43_t745c.A7 = "ACCCACCTCC" # HXB2 position 8379
+nl43_t745c.A3 = "AATTGGGTGTCGACAT" # HXB2 position 5777
+nl43_t745c.A4a = "CCTTAGGCATCTCCTA"  # HXB2 position 5955
+nl43_t745c.A4b = "GCATCTCCTATGGCAG"  # HXB2 position 5961
+nl43_t745c.A4c = "TTTGTTTCATGACAA" # HXB2 position 5937
+nl43_t745c.A4d = "TGTTGCTTTCATTGC" # HXB2 position 5918
+nl43_t745c.A5a = "GAAGAAGCGGAGACAG" # HXB2 position 5977
+nl43_t745c.A5b = "AAGCGGAGACAGCGA" # HXB2 position 5981
+nl43_t745c.A7 = "ACCCACCTCCCAATC" # HXB2 position 8379
+
+# for strain nl43_d3
+
+nl43_d3.D4_breakpoint_position = 5301 # first base after D4, position starts with 0, 5301..=5303: "GTA", HXB2 position 6045 (starts with 1)
+nl43_d3.A7_breakpoint_position = 7625 # first base after A7, position starts with 0, 7624..=7626: "ACC", HXB2 position 8379 (starts with 1)
+
+
+nl43_d3.D1 = "GGGGCGGCGACTGA" # HXB2 position 743, last base position
+nl43_d3.D1-unspliced = "GCGAGTACGCC" # HXB2 position 744, first base position # mutation T745C, which is the 2nd base of this sequence
+nl43_d3.gag-AUG = "GAGAGATGGGTGC" # HXB2 position starting 785, gag start codon AUG at 790, this sequence spans 785..=797, match unspliced RNA when D1 is not present.
+
+nl43_d3.A1 = "GGACAGCAGAGATCCA" # HXB2 position 4913
+nl43_d3.A2 = "AATCTGCTATAAGAAA" # HXB2 position 5390
+
+nl43_d3.D2 = "CTCTGGAAAG" # HXB2 position 4962
+nl43_d3.D2-unspliced = "GTGAAGGGGC" # HXB2 position 4963
+nl43_d3.D2b = "CAGATGGCAG" # HXB2 position 5058
+nl43_d3.D2b-unspliced = "GTGATGATTG" # HXB2 position 5059
+nl43_d3.D3 = "ACATAACAAG" # HXB2 position 5463
+nl43_d3.D3-unspliced = "GTAGGATCTC" # HXB2 position 5464
+
+nl43_d3.A3 = "AATTGGGTGTCGACAT" # HXB2 position 5777
+nl43_d3.A4a = "CCTTAGGCATCTCCTA"  # HXB2 position 5955
+nl43_d3.A4b = "GCATCTCCTATGGCAG"  # HXB2 position 5961
+nl43_d3.A4c = "TTTGTTTCATGACAA" # HXB2 position 5937
+nl43_d3.A4d = "TGTTGCTTTCATTGC" # HXB2 position 5918
+nl43_d3.A5a = "GAAGAAGCGGAGACAG" # HXB2 position 5977
+nl43_d3.A5b = "AAGCGGAGACAGCGA" # HXB2 position 5981
+nl43_d3.A7 = "ACCCACCTCCCAATC" # HXB2 position 8379

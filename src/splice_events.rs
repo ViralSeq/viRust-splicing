@@ -59,6 +59,13 @@ pub struct SpliceEvents {
     pub splice_category: SpliceChain,
     pub size_class: Option<SizeClass>,
     pub final_category: Option<String>,
+    // in case that we do not find D1 but we find the downstream acceptor (A1, etc),
+    // we should have a field to store the sequence information before the first splicing site.
+    // This is the alternative d1 donor site.
+    pub alternative_d1: Option<String>,
+    // sometimes, we do not know what happened after D1, they are not the known events (:d1_to_all),
+    // we should populate the sequence right after D1 (but known) for future analysis.
+    pub unknown_sequence_after_d1: Option<String>,
 }
 
 /// MARK: SpliceChain
@@ -75,6 +82,35 @@ pub enum SizeClass {
     FourKb,
     BothClass,
     Unknown,
+    Unspliced,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ProcessedSpliceRec<'a> {
+    pub seq: &'a [u8],
+    pub alternative_d1: Option<&'a [u8]>, // the alternative donor site if D1 is not found. Only store the sequence when we find an acceptor without D1.
+    pub unknown_sequence_after_d1: Option<&'a [u8]>,
+}
+
+impl ProcessedSpliceRec<'_> {
+    pub fn init<'a>(seq: &'a [u8]) -> ProcessedSpliceRec<'a> {
+        ProcessedSpliceRec {
+            seq,
+            alternative_d1: None,
+            unknown_sequence_after_d1: None,
+        }
+    }
+    pub fn init_with_option_fields<'a>(
+        seq: &'a [u8],
+        alternative_d1: Option<&'a [u8]>,
+        unknown_sequence_after_d1: Option<&'a [u8]>,
+    ) -> ProcessedSpliceRec<'a> {
+        ProcessedSpliceRec {
+            seq,
+            alternative_d1,
+            unknown_sequence_after_d1,
+        }
+    }
 }
 
 /// MARK: Impl SpliceEvents
@@ -90,6 +126,8 @@ impl SpliceEvents {
         let post_splice_sequence = None;
         let size_class = None;
         let final_category = None;
+        let alternative_d1 = None;
+        let unknown_sequence_after_d1 = None;
 
         SpliceEvents {
             sequence_id,
@@ -100,11 +138,21 @@ impl SpliceEvents {
             splice_category,
             size_class,
             final_category,
+            alternative_d1,
+            unknown_sequence_after_d1,
         }
     }
 
     pub fn add_post_splice_sequence(&mut self, sequence: String) {
         self.post_splice_sequence = Some(sequence);
+    }
+
+    pub fn add_alternative_d1(&mut self, sequence: Option<&[u8]>) {
+        self.alternative_d1 = sequence.map(|s| String::from_utf8_lossy(s).into_owned());
+    }
+
+    pub fn add_unknown_sequence_after_d1(&mut self, sequence: Option<&[u8]>) {
+        self.unknown_sequence_after_d1 = sequence.map(|s| String::from_utf8_lossy(s).into_owned());
     }
 
     /// MARK: find_size_class
@@ -114,8 +162,11 @@ impl SpliceEvents {
                 // if we find an A7 event, we know it is 1.8kb, nef transcript
                 self.size_class = Some(SizeClass::OnePointEightKb);
                 return Ok(());
-            } else if event == "unknown" || event == "noD1" || event == "D1-unspliced" {
+            } else if event == "unknown" || event == "noD1" {
                 self.size_class = Some(SizeClass::Unknown);
+                return Ok(());
+            } else if event == "D1-unspliced" || event == "gag-AUG" {
+                self.size_class = Some(SizeClass::Unspliced);
                 return Ok(());
             }
         }
@@ -242,7 +293,7 @@ impl Display for SpliceEvents {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             self.sequence_id,
             self.umi,
             self.umi_family.as_deref().unwrap_or("None"),
@@ -251,7 +302,9 @@ impl Display for SpliceEvents {
                 .as_ref()
                 .unwrap_or(&SizeClass::Unknown)
                 .to_string(),
-            self.final_category.as_deref().unwrap_or("Unknown")
+            self.final_category.as_deref().unwrap_or("Unknown"),
+            self.alternative_d1.as_deref().unwrap_or("None"),
+            self.unknown_sequence_after_d1.as_deref().unwrap_or("None"),
         )
     }
 }
@@ -274,12 +327,14 @@ impl Display for SizeClass {
             SizeClass::FourKb => write!(f, "4kb"),
             SizeClass::BothClass => write!(f, "Both"),
             SizeClass::Unknown => write!(f, "Unknown"),
+            SizeClass::Unspliced => write!(f, "Unspliced"),
         }
     }
 }
 
 /// MARK: FIND UMI FAMILY
 // TODO: This function uses multiple HashMaps and Vecs to store the data. It is not very efficient. Consider optimizing it.
+// add a way to find the common alternative_d1 and unknown_sequence_after_d1 for each umi family.
 pub fn find_umi_family_from_events(events: Vec<SpliceEvents>) -> Vec<SpliceEvents> {
     let events_by_final_category = group_by_final_category(events);
     let mut outcome_events = Vec::new();
@@ -327,8 +382,10 @@ fn slice_from_end(input: &str, chunk_size: u8, offset: u8, min_length: u8) -> Ve
         } else {
             0
         };
-        chunks.push(input[start..end].to_string());
-        end = start;
+        if let Some(substr) = input.get(start..end) {
+            chunks.push(substr.to_string());
+            end = start;
+        }
     }
     chunks
 }
@@ -354,6 +411,11 @@ mod tests {
         ];
         let result = slice_from_end(input, chunk_size, offset, 5);
         assert_eq!(result, expected);
+
+        let input2 = "ABCDEFGHIJKLMNO";
+
+        let result2 = slice_from_end(input2, chunk_size, offset, 5);
+        assert!(result2.is_empty());
     }
 
     #[test]
@@ -390,6 +452,8 @@ mod tests {
             },
             size_class: None,
             final_category: None,
+            alternative_d1: None,
+            unknown_sequence_after_d1: None,
         };
 
         let config =
@@ -485,12 +549,14 @@ mod tests {
             },
             size_class: Some(SizeClass::FourKb),
             final_category: None,
+            alternative_d1: None,
+            unknown_sequence_after_d1: None,
         };
         splice_event.predict_final_category();
 
         assert_eq!(
             splice_event.to_string(),
-            "test\tTTTTCCTAGGATATGGCTCCATAACTTAGGACAA\tNone\tD1_A1_D2_A2_D3_A3\t4kb\tD1_A1_D2_A2_D3_A3_4kb"
+            "test\tTTTTCCTAGGATATGGCTCCATAACTTAGGACAA\tNone\tD1_A1_D2_A2_D3_A3\t4kb\tD1_A1_D2_A2_D3_A3_4kb\tNone\tNone"
         );
     }
 
@@ -516,6 +582,8 @@ mod tests {
             },
             size_class: Some(SizeClass::FourKb),
             final_category: Some("D1_A1_D2_A2_D3_A3_4kb".to_string()),
+            alternative_d1: None,
+            unknown_sequence_after_d1: None,
         };
         let mut events_template_2 = SpliceEvents {
             sequence_id: "test".to_string(),
@@ -533,6 +601,8 @@ mod tests {
             },
             size_class: Some(SizeClass::OnePointEightKb),
             final_category: Some("D1_A2_D3_A7_1.8kb".to_string()),
+            alternative_d1: None,
+            unknown_sequence_after_d1: None,
         };
 
         for _ in 0..1000 {
