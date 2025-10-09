@@ -27,7 +27,7 @@ use std::process;
 ///TODO review name/about information below.  Can reimplement version information from ENV here if we start using versioning
 #[command(
     name = "viRust-splicing",
-    version = "1.0",
+    version = env!("CARGO_PKG_VERSION"),
     about = "High-performance 🦀Rust🦀-based tool that processes RNA sequencing data with unique molecular identifier (UMI) to identify and quantify complex HIV splicing patterns."
 )]
 pub struct InputConfig {
@@ -48,6 +48,7 @@ pub struct InputConfig {
 ///
 /// Full configuration for HIV splicing analysis, derived from input strain, query data,
 /// and the reference genome FASTA file.
+/// TODO: Consider adding steps for d1prime to all acceptors.
 #[derive(Debug)]
 pub struct SpliceConfig {
     pub strain: String,
@@ -60,6 +61,7 @@ pub struct SpliceConfig {
     pub d2b_unspliced: String,
     pub d3: String,
     pub d1_to_all: Vec<SpliceStep>,
+    pub d1prime_to_all: Vec<SpliceStep>, // TODO: add this step to the config
     pub alternative_d1_to_all: Vec<SpliceStep>, // this is for sequences missing D1, but looking for alternative D1 and acceptors
     pub d2_to_all: Vec<SpliceStep>,
     pub d2b_to_all: Vec<SpliceStep>,
@@ -201,6 +203,14 @@ impl SpliceConfig {
 
         let second_step = SpliceStep::build("D1", second_step_acceptor_sites, &query_list);
 
+        // D1primer steps
+
+        let mut d1prime_acceptor_list = vec!["D1-unspliced", "A1", "A2"];
+        d1prime_acceptor_list.append(&mut common_acceptor_sites.clone());
+
+        let d1prime_step =
+            SpliceStep::build_d1prime(d1prime_acceptor_list, &mut query_list.clone())?;
+
         // Alternative D1 and acceptors, for sequences missing D1
 
         let mut alternative_d1_acceptor_sites = vec!["A1", "A2"];
@@ -286,6 +296,7 @@ impl SpliceConfig {
             d2b_unspliced,
             d3,
             d1_to_all: second_step,
+            d1prime_to_all: d1prime_step, // TODO: add this step to the config
             alternative_d1_to_all,
             d2_to_all: fourth_step,
             d2b_to_all: fifth_step,
@@ -353,7 +364,7 @@ impl SpliceStep {
             let pattern = donor_pattern.clone() + query_list.get(acceptor).unwrap();
             if acceptor == "gag-AUG" {
                 // this is a special case, we only look for intact gag-AUG if no other acceptor is found
-                // so we only add it if the donor is "alternative_d1"
+                // we DO NOT combine D1 + gag-AUG, because it may match unspliced RNA when D1 is not present.
 
                 splice_steps.push(SpliceStep {
                     donor: donor.to_string(),
@@ -369,6 +380,28 @@ impl SpliceStep {
             });
         }
         splice_steps
+    }
+
+    pub fn build_d1prime(
+        acceptor_list: Vec<&str>,
+        query_list: &mut HashMap<String, String>,
+    ) -> Result<Vec<SpliceStep>, Box<dyn Error>> {
+        let mut d1_sequence = query_list
+            .get("D1")
+            .cloned()
+            .ok_or::<Box<dyn Error>>("Cannot find D1 sequence.".into())?;
+
+        let d1_unspliced = query_list
+            .get("D1-unspliced")
+            .cloned()
+            .ok_or::<Box<dyn Error>>("Cannot find D1-unspliced sequence.".into())?;
+
+        d1_sequence = d1_sequence + &d1_unspliced[..4];
+
+        query_list.insert("D1".to_string(), d1_sequence);
+        query_list.insert("D1-unspliced".to_string(), d1_unspliced[4..].to_string());
+
+        Ok(SpliceStep::build("D1", acceptor_list, query_list))
     }
 }
 
@@ -425,6 +458,8 @@ mod tests {
         assert_eq!(splice_config.d4_breakpoint_position, 5301);
         assert_eq!(splice_config.a7_breakpoint_position, 7625);
 
+        dbg!(&splice_config.alternative_d1_to_all);
+        dbg!(&splice_config.d1prime_to_all);
         assert_eq!(
             splice_config.alternative_d1_to_all[0].pattern,
             "GGACAGCAGAGATCCA"

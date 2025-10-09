@@ -1,5 +1,6 @@
-use bio::io::fasta::{self, Record};
+use bio::io::fasta;
 use rayon::prelude::*;
+use runner::*;
 use splice_events::find_umi_family_from_events;
 use std::error::Error;
 use std::fs::File;
@@ -8,14 +9,17 @@ use std::io::Write;
 use std::path::Path;
 
 pub mod config;
+pub mod io;
 pub mod joined_umi_sequence;
 pub mod ref_sequence;
+pub mod runner;
 pub mod splice_events;
 pub mod umi;
 
 // pub mod splice_events;
 
 use crate::config::{InputConfig, SpliceConfig};
+use crate::io::*;
 
 // TODO: modify error handling
 pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
@@ -25,33 +29,23 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     let r1_file_path = &config.filename_r1;
     let r2_file_path = &config.filename_r2;
 
-    let fasta_reader_r1 = open_fasta_file(r1_file_path)?;
-    let fasta_reader_r2 = open_fasta_file(r2_file_path)?;
+    // let fasta_reader_r1 = open_fasta_file(r1_file_path)?;
+    // let fasta_reader_r2 = open_fasta_file(r2_file_path)?;
+
+    let sequence_files = validate_input_files(r1_file_path, r2_file_path)?;
+    let records = open_sequence_files(&sequence_files)?;
 
     let output_path_str = &config.output_path.clone().unwrap();
     let output_path = Path::new(output_path_str);
-    let file_name = "output".to_owned()
+    let file_base_name = "output".to_owned()
         + "_strain_"
         + &config.query
         + "_distance_"
         + &config.distance.to_string()
         + "_assay_"
-        + &config.assay_type.to_string()
-        + ".tsv";
+        + &config.assay_type.to_string();
+    let file_name = file_base_name.clone() + ".tsv";
     let output_tsv_file = output_path.join(file_name);
-
-    // collect records
-    // need to add homopolymer check here.
-    // records with homopolymer (10 or more) in the either of the paired R1 or R2 will be skipped.
-    let records: Vec<(Record, Record)> = fasta_reader_r1
-        .records()
-        .zip(fasta_reader_r2.records())
-        .map(|(r1_res, r2_res)| {
-            let r1 = r1_res?;
-            let r2 = r2_res?;
-            Ok::<_, Box<dyn Error>>((r1, r2))
-        })
-        .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
 
     let splice_config = SpliceConfig::build_from_input(config)?;
 
@@ -80,7 +74,6 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     #[cfg(debug_assertions)]
     dbg!(println!("{:#?}", splice_events));
 
-    // TODO: efficiency test needed
     let splice_events_with_umi_family = find_umi_family_from_events(splice_events);
 
     let mut file = File::create(&output_tsv_file)?;
@@ -98,6 +91,31 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
         writeln!(file, "{}", res.to_string())?;
     }
 
+    if check_r_installed().is_err() {
+        println!("R is not installed or not found in PATH. Skipping data summarization with R.");
+        return Ok(());
+    }
+
+    if check_r_packages().is_err() {
+        println!("Required R packages are not installed. Skipping data summarization with R.");
+        return Ok(());
+    }
+
+    let output_summary_file = output_path.join(file_base_name + "_summary.csv");
+
+    if let Err(e) = r_summarize_data(
+        output_tsv_file.to_str().unwrap(),
+        output_summary_file.to_str().unwrap(),
+    ) {
+        println!("Data summarization failed: {}", e);
+    } else {
+        println!(
+            "Data summarization completed. Summary file created at: {}",
+            output_summary_file
+                .to_str()
+                .unwrap_or("Error converting path to string...")
+        );
+    }
     Ok(())
 }
 

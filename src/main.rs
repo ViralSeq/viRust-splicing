@@ -5,10 +5,11 @@ use virust_splicing::config::InputConfig;
 
 fn main() {
     println!(
-        "{}",
-        "ViRust-Splicing for processing HIV splicing data.\n Placeholder for more information."
+        "{} {}",
+        "ViRust-Splicing for processing HIV splicing data.\n By Shuntai Zhou and Michael Clark @ Zhou lab, 2025\n Version:"
             .cyan()
-            .bold()
+            .bold(),
+        env!("CARGO_PKG_VERSION").cyan().bold()
     );
     let config = InputConfig::build().unwrap_or_else(|err| {
         eprintln!(

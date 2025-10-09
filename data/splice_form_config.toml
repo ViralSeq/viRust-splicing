@@ -33,12 +33,16 @@ nl43_t745a.A7_breakpoint_position = 7625 # first base after A7, position starts 
 
 
 nl43_t745a.D1 = "GGGGCGGCGACTG" # HXB2 position 743, last base position
+# nl43_t745a.D1 = "GGGGCGGCGACTGGAGA" # HXB2 position 747, last base position, D1-prime 
+
 nl43_t745a.D1-unspliced = "GAGAGTACGCC" # HXB2 position 744, first base position # mutation T745A, which is the 2nd base of this sequence
+# nl43_t745a.D1-unspliced = "GTACGCCAAAAA" # HXB2 position 748, first base position, D1-prime unspliced.
+
 nl43_t745a.gag-AUG = "GAGAGATGGGTGC" # HXB2 position starting 785, gag start codon AUG at 790, this sequence spans 785..=797, match unspliced RNA when D1 is not present.
 
 nl43_t745a.A1 = "GGACAGCAGAGATCCA" # HXB2 position 4913
 nl43_t745a.A2 = "AATCTGCTATAAGAAA" # HXB2 position 5390
-
+             
 nl43_t745a.D2 = "CTCTGGAAAG" # HXB2 position 4962
 nl43_t745a.D2-unspliced = "GTGAAGGGGC" # HXB2 position 4963
 nl43_t745a.D2b = "CAGATGGCAG" # HXB2 position 5058
@@ -91,7 +95,7 @@ nl43_d3.A7_breakpoint_position = 7625 # first base after A7, position starts wit
 
 
 nl43_d3.D1 = "GGGGCGGCGACTGA" # HXB2 position 743, last base position
-nl43_d3.D1-unspliced = "GCGAGTACGCC" # HXB2 position 744, first base position # mutation T745C, which is the 2nd base of this sequence
+nl43_d3.D1-unspliced = "GTACGCCAAAAA" # HXB2 position 744, first base position # mutation T745C, which is the 2nd base of this sequence
 nl43_d3.gag-AUG = "GAGAGATGGGTGC" # HXB2 position starting 785, gag start codon AUG at 790, this sequence spans 785..=797, match unspliced RNA when D1 is not present.
 
 nl43_d3.A1 = "GGACAGCAGAGATCCA" # HXB2 position 4913

@@ -1,0 +1,104 @@
+---
+title: "HIV Splicing Assay Report (Test Report for Main Functions in qmd)"
+author: "Shuntai Zhou / Zhou Lab @UNC-CH"
+format:
+  html:
+    toc: true              # enable table of contents
+    toc-location: left     # or "right"
+    toc-float: true        # make TOC floating
+    number-sections: true  # optional, for numbered headings
+    code-fold: false       # don’t allow toggling
+    code-summary: none
+    code-line-numbers: false
+    code-tools: false
+    code-copy: false
+    code-block-bg: false
+    code-block-border-left: false
+    theme: cosmo           # or lumen, flatly, etc.
+    smooth-scroll: true
+    self-contained: true
+    embed-resources: true
+execute:
+  echo: false              # hide all code by default
+  warning: false
+  message: false
+---
+
+```{r setup, include=FALSE}
+# allows the interactive shell has the same behavior as rendering
+if (interactive()) {
+  setwd(here::here())  # or dirname(rstudioapi::getActiveDocumentContext()$path)
+}
+```
+
+```{r}
+library(tidyverse)
+library(patchwork)
+library(arsenal)
+library(finalfit)
+library(ggsci)
+library(reticulate)
+theme_set(theme_bw())
+```
+
+
+```{r}
+# Read data 
+
+data <- read_csv("output_summary.csv")
+
+data <- data  %>% 
+  mutate(
+    main_acceptor_after_d1 = case_when(
+      str_detect(splice_category_2, "D1_A1") ~ "A1",
+      str_detect(splice_category_2, "D1_A2") ~ "A2",
+      str_detect(splice_category_2, "D1_A3") ~ "A3",
+      str_detect(splice_category_2, "D1_A4") ~ "A4",
+      str_detect(splice_category_2, "D1_A5") ~ "A5",
+      str_detect(splice_category_2, "D1_A7") ~ "A7"
+    ), 
+    main_acceptor_after_d1 = ifelse(spliced == "unspliced", "unspliced", main_acceptor_after_d1),
+    main_acceptor_after_d1 = ff_label(main_acceptor_after_d1, "Main Acceptor After D1")
+  )
+
+# define alternative D1
+
+list_GC_1 <- c("GCTGAAGCGCGCACG") # use GC after DIS
+list_GC_2 <- c("CGCGCACGGCAAGAG") # use GC 5 base down first GC
+
+list_GT_gag_AUG <- c("GAAGGAGAGAGATGG")
+
+list_GT_gag_down <- c("GGTGCGAGAGCGTCG")
+
+data <- data %>% 
+  mutate(
+    D1_type_revised = ifelse((spliced == "spliced" & D1_type != "Alternative D1"), D1_type, NA)
+  ) %>% 
+  mutate(
+    D1_type_revised = case_when(
+      (spliced == "spliced" & (alternative_d1_used_common %in% list_GC_1)) ~ "GC 3 base downstream of DIS",
+      (spliced == "spliced" & (alternative_d1_used_common %in% list_GC_2)) ~ "GC 10 base downstream of DIS",
+      (spliced == "spliced" & (alternative_d1_used_common %in% list_GT_gag_AUG)) ~ "GU downstream gag AUG",
+      (spliced == "spliced" & (alternative_d1_used_common %in% list_GT_gag_down)) ~ "GU further downstream in gag",
+      (spliced == "spliced" & alternative_d1_used_common != "None") ~ "Others",
+      T ~ D1_type_revised
+    ),
+  )
+```
+
+
+```{r}
+splice_form_data <- read_csv("spliceforms_short.csv")
+data <- data %>% 
+  left_join(splice_form_data, by = c("splice_category_2" = "SpliceForm"))
+
+data = data %>% mutate(
+    splice_cat2  = splice_cat2 %>%  ff_label("Splice isoforms (Shortened)"),
+    splice_category_2 = splice_category_2 %>%  ff_label("Splice isoforms (Extended)")
+  )
+
+data %>% filter(spliced == "spliced") %>% count(splice_cat2, sort = T) 
+data %>% filter(!is.na(step8)) %>% count(splice_cat2)
+data %>% filter(!is.na(step8)) %>% count(splice_category_2)
+```
+

@@ -1,0 +1,27 @@
+---
+title: "HIV Splicing Assay Report"
+author: "Shuntai Zhou / Zhou Lab @UNC-CH"
+format:
+  html:
+    toc: true              # enable table of contents
+    toc-location: left     # or "right"
+    toc-float: true        # make TOC floating
+    number-sections: true  # optional, for numbered headings
+    code-fold: false       # don’t allow toggling
+    code-summary: none
+    code-line-numbers: false
+    code-tools: false
+    code-copy: false
+    code-block-bg: false
+    code-block-border-left: false
+    theme: cosmo           # or lumen, flatly, etc.
+    smooth-scroll: true
+execute:
+  echo: false              # hide all code by default
+  warning: false
+  message: false
+---
+
+```{r}
+library(tidyverse)
+```

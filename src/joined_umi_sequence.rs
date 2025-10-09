@@ -177,9 +177,12 @@ impl JoinedUmiSequnce {
 ///
 /// The stages are defined as:
 /// - **1:** Search for D1.
+///   - If D1 is found, continue to stage 2.
+///   - If D1 is not found, jump to stage 8 to search for acceptors without D1.
 /// - **2:** Find acceptor downstream of D1.
 ///   - If acceptor is `"A1"`, continue to stage 3.
 ///   - If acceptor is `"A2"`, jump to stage 5.
+///   - If no acceptor is found, jump to stage 9. It is possible that D1prime is present. With the addtional 4 bases downstream of D1, pattern matching with D1 and acceptors will fail. We need to search for D1prime and acceptors downstream of D1prime.
 /// - **3:** Search for D2 (A1 branch).
 /// - **4:** Find acceptor downstream of D2.
 ///   - If acceptor is `"D2-unspliced"`, continue to stage 6.
@@ -188,10 +191,21 @@ impl JoinedUmiSequnce {
 /// - **6:** Search for D2b (in the D2-unspliced branch).
 ///   - If an acceptor from D2b is found and it is `"A2"`, jump to stage 5.
 /// - **7:** Look for an acceptor after D3.
+/// - **8:** Search for acceptors without D1 or D1prime(for sequences missing D1 or D1prime), find alternative D1
+///   - If acceptor is `"A1"`, continue to stage 3.
+///   - If acceptor is `"A2"`, jump to stage 5.
+///   - If acceptor is `"gag-AUG"`, consider it as unspliced and stop further searching.
+///   - If no acceptor is found, mark as `"no-acceptor"` and stop further searching.
+/// - **9:** Search for acceptors downstream of D1prime, D1prime has the cleavage site 4 bases downstream of D1.
+///   - If acceptor is `"A1"`, continue to stage 3.
+///   - If acceptor is `"A2"`, jump to stage 5.
+///   - If D1prime is not found, go to stage 8 to search for acceptors without D1 or D1prime.
 ///
 /// # Returns
 /// The remaining sequence after processing.
 /// TODO！Fix all the issues and complete the TODOs in this function.
+/// Possible issues:
+/// 1. To find potential new splice junctions. Think about the best way to do this.
 fn process_splice_rec<'a>(
     splice_rec: ProcessedSpliceRec<'a>,
     chain: &mut SpliceChain,
@@ -240,15 +254,19 @@ fn process_splice_rec<'a>(
                 //Export the unknown sequence to the field of unknown_sequence_after_d1 in SpliceEvents struct.
                 //may only need to keep up to 15 bases
 
-                let query_length = splice_rec.seq.len().min(15); // Limit to the first 15 bases, if the query sequence is shorter, take all of it.
+                let d1_length = config.d1.len();
+                let query_length = splice_rec.seq.len().min(d1_length + 15); // Limit to the first 15 bases, if the query sequence is shorter, take all of it.
                 if query_length > 0 {
-                    let unknown_sequence_after_d1 = Some(&splice_rec.seq[..query_length]);
+                    let unknown_sequence_after_d1 = Some(&splice_rec.seq[d1_length..query_length]);
 
-                    ProcessedSpliceRec::init_with_option_fields(
+                    let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
                         splice_rec.seq,
                         splice_rec.alternative_d1,
                         unknown_sequence_after_d1,
-                    )
+                    );
+
+                    // This can be problematic. If there is a mismatch in the first acceptor site, it may pick up the second acceptor site sequence and it may look like another splice isoform.
+                    process_splice_rec(new_splice_rec, chain, config, 9) // Jump to stage 9 to search for D1prime.
                 } else {
                     splice_rec
                 }
@@ -396,6 +414,52 @@ fn process_splice_rec<'a>(
             } else {
                 chain.add_splice_event("no-acceptor".to_string());
                 splice_rec
+            }
+        }
+
+        // D1prime processing
+        9 => {
+            if let Some((acc, new_seq)) =
+                pattern_search_trim_seq_batch(splice_rec.seq, &config.d1prime_to_all, distance)
+            {
+                // Replace the preceeding "D1" with "D1prime"
+                chain.remove_splice_event("D1".to_string());
+                chain.remove_splice_event("unknown".to_string());
+                chain.add_splice_event("D1prime".to_string());
+                // add the acceptor after D1prime
+                chain.add_splice_event(acc.clone());
+
+                let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                    new_seq,
+                    splice_rec.alternative_d1,
+                    splice_rec.unknown_sequence_after_d1,
+                );
+                match acc.as_str() {
+                    "A1" => process_splice_rec(new_splice_rec, chain, config, 3),
+                    "A2" => process_splice_rec(new_splice_rec, chain, config, 5),
+                    _ => new_splice_rec,
+                }
+            } else {
+                //Need to know what sequence is left here for futher inspection.
+                //Export the unknown sequence to the field of unknown_sequence_after_d1 in SpliceEvents struct.
+                //may only need to keep up to 15 bases
+
+                let d1_length = config.d1.len() + 4; // d1prime is 4 bases downstream of d1. So we add 4 to the length of d1.
+                let query_length = splice_rec.seq.len().min(d1_length + 15); // Limit to the first 15 bases, if the query sequence is shorter, take all of it.
+                if query_length > 0 && query_length > d1_length {
+                    let unknown_sequence_after_d1 = Some(&splice_rec.seq[d1_length..query_length]);
+
+                    let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                        splice_rec.seq,
+                        splice_rec.alternative_d1,
+                        unknown_sequence_after_d1,
+                    );
+
+                    // This can be problematic. If there is a mismatch in the first acceptor site, it may pick up the second acceptor site sequence and it may look like another splice isoform.
+                    process_splice_rec(new_splice_rec, chain, config, 8) // Jump to stage 8 to search for acceptors with unknown sequence after D1 or D1prime. In this case we shouldn't miss alternative D1 right after D1.
+                } else {
+                    splice_rec
+                }
             }
         }
         _ => splice_rec,
