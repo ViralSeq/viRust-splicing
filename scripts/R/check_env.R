@@ -10,7 +10,11 @@ packages <- c(
   "arsenal",
   "finalfit",
   "ggsci",
-  "reticulate")
+  "reticulate",
+  "ggalluvial",
+  "ggrepel",
+  "ggnewscale",
+  "scico")
 
 # Install packages that are not already installed
 install.packages(

@@ -1,2 +1,0 @@
-linters: lintr::default_linters
-cache: FALSE

@@ -361,7 +361,15 @@ impl SpliceStep {
         let mut splice_steps: Vec<SpliceStep> = Vec::new();
         let donor_pattern = query_list.get(donor).unwrap_or(&"".to_string()).to_string();
         for acceptor in acceptor_list {
-            let pattern = donor_pattern.clone() + query_list.get(acceptor).unwrap();
+            // Special case: if the donor is D3, use only the first 6 bases of acceptor to make the pattern to maximize the chance of finding D3 splicing events
+            let mut acceptor_pattern = query_list
+                .get(acceptor)
+                .unwrap_or(&"".to_string())
+                .to_string();
+            if donor == "D3" {
+                acceptor_pattern = acceptor_pattern[..6].to_string(); // we have ensure that all the acceptors are at least 6 bases long in the config file
+            }
+            let pattern = donor_pattern.clone() + &acceptor_pattern;
             if acceptor == "gag-AUG" {
                 // this is a special case, we only look for intact gag-AUG if no other acceptor is found
                 // we DO NOT combine D1 + gag-AUG, because it may match unspliced RNA when D1 is not present.

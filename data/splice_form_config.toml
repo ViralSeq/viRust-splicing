@@ -15,8 +15,8 @@ nl43.D2-unspliced = "GTGAAGGGGC" # HXB2 position 4963
 nl43.D2b = "CAGATGGCAG" # HXB2 position 5058
 nl43.D2b-unspliced = "GTGATGATTG" # HXB2 position 5059
 nl43.D3 = "ACATAACAAG" # HXB2 position 5463
-nl43.D3-unspliced = "GTAGGATCTC" # HXB2 position 5464
 
+nl43.D3-unspliced = "GTAGGATCTC" # HXB2 position 5464
 nl43.A3 = "AATTGGGTGTCGACAT" # HXB2 position 5777
 nl43.A4a = "CCTTAGGCATCTCCTA"  # HXB2 position 5955
 nl43.A4b = "GCATCTCCTATGGCAG"  # HXB2 position 5961
