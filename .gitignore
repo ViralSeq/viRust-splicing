@@ -3,6 +3,4 @@
 /sim_data
 .DS_Store
 output.tsv
-.lintr
-/tests/quarto/.lintr
 /tests/quarto/report.html
