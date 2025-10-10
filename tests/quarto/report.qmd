@@ -47,6 +47,18 @@ theme_set(theme_bw())
 
 
 ```{r}
+if (!py_module_available("pandas")) {
+  py_install("pandas")
+} else {message("pandas installed")}
+
+if (!py_module_available("plotly")) {
+  py_install("plotly")
+} else {message("plotly installed")}
+
+```
+
+
+```{r}
 # get variables from ARGVs, here we hard-code these variables
 
 assay_type = "random-reverse"
@@ -463,7 +475,9 @@ for (des in c("A3", "A4", "A5", "A7", "vif", "vpr")) {
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
 
 
-## Splicing Events Cascade Summary
+## Splicing Events Cascade Plots
+
+### Splicing cascade alluvial plot
 
 ```{r}
 df_alluvium <- data %>% group_by(splice_cat2) %>% 
@@ -477,7 +491,7 @@ df_alluvium %>% filter(
 n <- df_alluvium_short$splice_category_count %>% sum()
 cut_off_to_show = n * 0.03
 df_alluvium_transformed <- df_alluvium_short %>% pivot_longer(cols = 1:8, names_to = "Steps") 
-
+df_alluvium_transformed %>% write_csv("cascade_data.csv")
 df_alluvium_transformed %>% 
   ggplot(aes(x = Steps, 
              stratum = value,
@@ -497,6 +511,61 @@ df_alluvium_transformed %>%
     y = "UMI count"
   ) 
 ```
+
+
+### Splicing cascade Sankey plot
+
+```{python}
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+
+# Load data
+df = pd.read_csv("cascade_data.csv").dropna(subset=["value"])
+
+# Build node list
+nodes = list(df["value"].unique())
+node_index = {ev:i for i,ev in enumerate(nodes)}
+
+# Assign isoform colors
+isoforms = df["splice_cat2"].unique()
+palette = px.colors.qualitative.Set3
+if len(isoforms) > len(palette):
+    palette = palette * ((len(isoforms) // len(palette)) + 1)
+colors = {iso: palette[i] for i, iso in enumerate(isoforms)}
+
+# Build links with hover labels
+sources, targets, values, link_labels, link_colors = [], [], [], [], []
+for isoform, group in df.groupby("splice_cat2"):
+    group = group.sort_values("Steps")
+    events = group["value"].tolist()
+    count = group["splice_category_count"].iloc[0]
+    for i in range(len(events)-1):
+        sources.append(node_index[events[i]])
+        targets.append(node_index[events[i+1]])
+        values.append(count)
+        link_labels.append(f"Isoform: {isoform}<br>Count: {count}")
+        link_colors.append(colors[isoform])
+
+fig = go.Figure(go.Sankey(
+    arrangement="snap",
+    node=dict(label=nodes, pad=15, thickness=20),
+    link=dict(
+        source=sources,
+        target=targets,
+        value=values,
+        color=link_colors,
+        label=link_labels,
+        hovertemplate="%{label}<extra></extra>"
+    )
+))
+
+fig.update_layout(
+    title_text="HIV Splicing Isoform Sankey (hover to see isoform + count)",
+    font_size=12
+)
+```
+
 
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
 
