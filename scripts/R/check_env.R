@@ -14,7 +14,9 @@ packages <- c(
   "ggalluvial",
   "ggrepel",
   "ggnewscale",
-  "scico")
+  "scico",
+  "jsonlite",
+)
 
 # Install packages that are not already installed
 install.packages(
