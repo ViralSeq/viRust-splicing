@@ -3,4 +3,4 @@
 /sim_data
 .DS_Store
 output.tsv
-/tests/quarto/report.html
+/tests/quarto/*.html

@@ -47,7 +47,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     let file_name = file_base_name.clone() + ".tsv";
     let output_tsv_file = output_path.join(file_name);
 
-    let splice_config = SpliceConfig::build_from_input(config)?;
+    let splice_config = SpliceConfig::build_from_input(config.clone())?;
 
     #[cfg(debug_assertions)]
     dbg!(&splice_config);
@@ -101,13 +101,14 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let output_summary_file = output_path.join(file_base_name + "_summary.csv");
+    let output_summary_file = output_path.join(file_base_name.clone() + "_summary.csv");
 
     if let Err(e) = r_summarize_data(
         output_tsv_file.to_str().unwrap(),
         output_summary_file.to_str().unwrap(),
     ) {
         println!("Data summarization failed: {}", e);
+        return Ok(());
     } else {
         println!(
             "Data summarization completed. Summary file created at: {}",
@@ -116,6 +117,38 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
                 .unwrap_or("Error converting path to string...")
         );
     }
+
+    let check_quarto = check_quarto_installed();
+    let check_python3 = check_python3_installed();
+
+    if check_quarto.is_err() || check_python3.is_err() {
+        println!(
+            "Quarto cannot be executed. Skipping HTML report generation.\nQuarto check: {:?}\nPython3 check: {:?}",
+            check_quarto, check_python3
+        );
+        return Ok(());
+    }
+
+    if let Err(e) = run_quarto_report(
+        &config.assay_type.to_string(),
+        &config.query,
+        &config.distance,
+        r1_file_path,
+        r2_file_path,
+        &(file_base_name.clone() + "_summary.csv"),
+        output_path,
+    ) {
+        println!("Quarto report generation failed: {}", e);
+    } else {
+        println!(
+            "HTML report generated at: {}",
+            output_path
+                .join("report.html")
+                .to_str()
+                .unwrap_or("Error converting path to string...")
+        );
+    }
+
     Ok(())
 }
 
