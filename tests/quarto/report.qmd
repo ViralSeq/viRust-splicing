@@ -759,20 +759,15 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   #splice-map .link:hover{stroke-opacity:.9}
   #splice-map .highlight{stroke-opacity:.95!important}
   #splice-map .arc-label{
-    font:12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    font:14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
     fill:#111;
     paint-order:stroke;stroke:#fff;stroke-width:3px;
     pointer-events:none;
   }
-  #splice-map,
-#splice-map .wrap,
-#splice-map svg {
-  overscroll-behavior: contain; /* keep wheel/pinch from bubbling to page */
-}
 
-#splice-map .wrap {
-  overflow: hidden; /* hide any horizontal scrollbar flash in the container */
-}
+  /* stop page scroll while zooming */
+  #splice-map, #splice-map .wrap, #splice-map svg { overscroll-behavior: contain; }
+  #splice-map .wrap { overflow: hidden; }
 </style>
 
 <div id="splice-map">
@@ -800,26 +795,12 @@ window.addEventListener('DOMContentLoaded', () => {
   ];
   const cfg = {
     colors:{D1:"#4a90e2",D2:"#f5a623",D3:"#999",D4:"#777"},
-    directionsUp:["D1","A2"],
-    // links:[
-    //   {from:"D1",to:"A1",w:7,label:"D1_A2_D3_A4 7%"},
-    //   {from:"D1",to:"A1",w:5,label:"D1_A1 5%"},
-    //   {from:"D1",to:"A1",w:4,label:"D1_A1 4%"},
-    //   {from:"D1",to:"A7",w:3,label:"D1_A7 3%"},
-    //   {from:"D1",to:"A2",w:3,label:"D1_A2 3%"},
-    //   {from:"D1",to:"A3",w:3,label:"D1_A3 3%"},
-    //   {from:"D1",to:"A4",w:3,label:"D1_A4 3%"},
-    //   {from:"D2",to:"A4",w:3,label:"D2_A4 3%"},
-    //   {from:"D2",to:"A5",w:3,label:"D2_A5 3%"},
-    //   {from:"D2",to:"A6",w:3,label:"D2_A6 3%"},
-    //   {from:"D2",to:"A7",w:3,label:"D2_A7 3%"}
-    // ]
+    directionsUp:["D1","A2"]
   };
   const dir = f => cfg.directionsUp.includes(f) ? "up" : "down";
 
   let links = Array.isArray(window.links) ? window.links : [];
 
-  // if empty, display message inside SVG and stop drawing
   if (!links.length) {
     const svg = d3.select("#c")
       .attr("viewBox", "0 0 800 200")
@@ -833,24 +814,17 @@ window.addEventListener('DOMContentLoaded', () => {
       .attr("fill", "#777")
       .attr("font-size", 20)
       .text("No links found");
-
     return;
   }
 
   const maxPercent = d3.max(links, d => d.percent);
-
-  // if the widths are too subtle, change to .range([1,20])
-  const widthScale = d3.scaleSqrt()
-    .domain([0, maxPercent])
-    .range([1, 15]);
+  const widthScale = d3.scaleSqrt().domain([0, maxPercent]).range([1, 15]);
 
   links = links.map(l => ({
     ...l,
-    label: `${l.from}➞${l.to}`,
+    label: `${l.from}➞${l.to} ${l.percent}%`,
     strokeWidth: widthScale(l.percent)
   }));
-
-  // console.log({links});
 
   // --- Setup ---
   const svg = root.select("#c")
@@ -858,7 +832,29 @@ window.addEventListener('DOMContentLoaded', () => {
     .attr("preserveAspectRatio","xMidYMid meet");
   const g = svg.append("g").attr("transform",`translate(${M.l},${M.t})`);
 
-  const x = d3.scaleLinear().domain([0,9000]).range([0,innerW]);
+  // >>>>>>> PIECEWISE SCALE WITH STRETCH ON [4500, 6000] <<<<<<<
+  const focusStart = 4500, focusEnd = 6000, stretch = 2; // make middle 2× wider
+  const L1 = focusStart - 0;         // 0..4500
+  const L2 = focusEnd - focusStart;  // 4500..6000
+  const L3 = 9000 - focusEnd;        // 6000..9000
+
+  const W1 = L1;           // normal
+  const W2 = L2 * stretch; // stretched
+  const W3 = L3;           // normal
+
+  const totalWeighted = W1 + W2 + W3;
+  const unit = innerW / totalWeighted;
+
+  const r0 = 0;
+  const r1 = r0 + W1 * unit;        // mapped position for 4500
+  const r2 = r1 + W2 * unit;        // mapped position for 6000
+  const r3 = r2 + W3 * unit;        // mapped position for 9000 (≈ innerW)
+
+  // Piecewise linear scale: domain breakpoints map to range breakpoints.
+  const x = d3.scaleLinear()
+    .domain([0, focusStart, focusEnd, 9000])
+    .range([0, r1, r2, r3]);
+
   const xAxis = d3.axisBottom(x).ticks(9).tickSizeOuter(0);
 
   const axisG = g.append("g").attr("transform",`translate(0,${baselineY})`);
@@ -897,12 +893,9 @@ window.addEventListener('DOMContentLoaded', () => {
   };
 
   // --- Links + labels ---
-  const w = d3.scaleLinear()
-    .domain(d3.extent(links, d=>d.w))
-    .range([2,10]);
   const linkG = g.append("g").attr("class","links");
 
-  const linkPaths = linkG.selectAll("path")
+  linkG.selectAll("path")
     .data(links)
     .join("path")
       .attr("class","link")
@@ -915,7 +908,7 @@ window.addEventListener('DOMContentLoaded', () => {
         return arcPath(x0,x1,dir(d.from),0.33+j);
       })
     .append("title")
-      .text(d=>`${d.label || `${d.from}→${d.to}`}  (w=${d.w})`);
+      .text(d=>`${d.label} (w=${d.w}${d.percent!=null?`, ${d.percent}%`:''})`);
 
   const labelsG = g.append("g").attr("class","labels");
   labelsG.selectAll("text")
@@ -927,7 +920,7 @@ window.addEventListener('DOMContentLoaded', () => {
       .attr("href",(_,i)=>`#arc-${i}`)
       .attr("startOffset","50%")
       .attr("text-anchor","middle")
-      .text(d=>d.label || `${d.from}→${d.to}`);
+      .text(d=>d.label);
 
   // --- Legend ---
   const legend = svg.append("g").attr("transform",`translate(${W-190},${M.t})`);
