@@ -88,11 +88,11 @@ strain <- strain %>% toupper()
 
 
 ```{r}
-# Read data 
+# Read data
 
 data <- read_csv(summary_data_path)
 
-data <- data  %>% 
+data <- data  %>%
   mutate(
     main_acceptor_after_d1 = case_when(
       str_detect(splice_category_2, "D1_A1") ~ "A1",
@@ -101,7 +101,7 @@ data <- data  %>%
       str_detect(splice_category_2, "D1_A4") ~ "A4",
       str_detect(splice_category_2, "D1_A5") ~ "A5",
       str_detect(splice_category_2, "D1_A7") ~ "A7"
-    ), 
+    ),
     main_acceptor_after_d1 = ifelse(spliced == "unspliced", "unspliced", main_acceptor_after_d1),
     main_acceptor_after_d1 = ff_label(main_acceptor_after_d1, "Main Acceptor After D1")
   )
@@ -115,10 +115,10 @@ list_GT_gag_AUG <- c("GAAGGAGAGAGATGG")
 
 list_GT_gag_down <- c("GGTGCGAGAGCGTCG")
 
-data <- data %>% 
+data <- data %>%
   mutate(
     D1_type_revised = ifelse((spliced == "spliced" & D1_type != "Alternative D1"), D1_type, NA)
-  ) %>% 
+  ) %>%
   mutate(
     D1_type_revised = case_when(
       (spliced == "spliced" & (alternative_d1_used_common %in% list_GC_1)) ~ "GC 3 base downstream of DIS",
@@ -135,7 +135,7 @@ data <- data %>%
 ```{r}
 # Here we merge the splice isoform information with the data
 splice_form_data <- read_csv(splice_isoform_csv)
-data <- data %>% 
+data <- data %>%
   left_join(splice_form_data, by = c("splice_category_2" = "SpliceForm"))
 
 data = data %>% mutate(
@@ -163,7 +163,7 @@ Report generated on `r format(Sys.time(), "%Y-%m-%d %H:%M:%S")`
 
 **Input File 1 path:** `r file1`
 
-**Input File 2 path:** `r file2` 
+**Input File 2 path:** `r file2`
 
 ---
 
@@ -174,7 +174,7 @@ Report generated on `r format(Sys.time(), "%Y-%m-%d %H:%M:%S")`
 
   2. ***CSF file:*** Summarized splice isoform analysis. One record per UMI family. NOTE: UMI family size less than 3 are not shown.
 
-  3. ***HTML file:*** Splice isoform analysis and visualization. 
+  3. ***HTML file:*** Splice isoform analysis and visualization.
 
 :::
 
@@ -192,30 +192,30 @@ quarto render report.qmd --execute-params quarto_params.json
 
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
 
-## Overal Spliced vs. Unpliced 
+## Overal Spliced vs. Unpliced
 
 ### Summary table
 
 ```{r, results = 'asis'}
-data  %>% 
-  mutate(spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown")))%>% 
+data  %>%
+  mutate(spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown")))%>%
   tableby(~ spliced, data = .)  %>% summary()
 ```
 
 
 ### Percent spliced
 ```{r}
-data %>% 
-  count(spliced, sort = TRUE)  %>% 
+data %>%
+  count(spliced, sort = TRUE)  %>%
   mutate(
-    percent = 100 * n/ sum(n), 
+    percent = 100 * n/ sum(n),
     spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown"))
-  )  %>% 
-  ggplot(aes(x = 2, y = percent, fill = spliced)) + 
-  geom_col(color = "white") + 
+  )  %>%
+  ggplot(aes(x = 2, y = percent, fill = spliced)) +
+  geom_col(color = "white") +
   coord_polar(theta = "y") +
-  geom_text(aes(label = round(percent, 1)), 
-            position = position_stack(vjust = 0.5), 
+  geom_text(aes(label = round(percent, 1)),
+            position = position_stack(vjust = 0.5),
             color = "white") +
   scale_fill_nejm(name = "") +
   xlim(0.5, 2.5) +
@@ -224,18 +224,18 @@ data %>%
        subtitle = "Including unknown") -> p1
 
 
-data %>% 
-  count(spliced, sort = TRUE) %>% 
-  filter(spliced != "unknown") %>% 
+data %>%
+  count(spliced, sort = TRUE) %>%
+  filter(spliced != "unknown") %>%
   mutate(
-    percent = 100 * n/ sum(n), 
+    percent = 100 * n/ sum(n),
     spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown"))
-  )  %>% 
-  ggplot(aes(x = 2, y = percent, fill = spliced)) + 
-  geom_col(color = "white") + 
+  )  %>%
+  ggplot(aes(x = 2, y = percent, fill = spliced)) +
+  geom_col(color = "white") +
   coord_polar(theta = "y") +
-  geom_text(aes(label = round(percent, 1)), 
-            position = position_stack(vjust = 0.5), 
+  geom_text(aes(label = round(percent, 1)),
+            position = position_stack(vjust = 0.5),
             color = "white") +
   scale_fill_nejm() +
   xlim(0.5, 2.5) +
@@ -258,7 +258,7 @@ Unknown splice types can come from mismatches (sequencing errors), unrecognized 
 ```{r, results = 'asis'}
 # get main donor after D1
 
-data <- data %>% 
+data <- data %>%
   mutate(
     main_acceptor_after_d1 = case_when(
       str_detect(splice_category_2, "D1_A1") ~ "A1",
@@ -267,7 +267,7 @@ data <- data %>%
       str_detect(splice_category_2, "D1_A4") ~ "A4",
       str_detect(splice_category_2, "D1_A5") ~ "A5",
       str_detect(splice_category_2, "D1_A7") ~ "A7"
-    ), 
+    ),
     main_acceptor_after_d1 = ifelse(spliced == "unspliced", "unspliced", main_acceptor_after_d1),
     main_acceptor_after_d1 = ff_label(main_acceptor_after_d1, "Main Acceptor After D1")
   )
@@ -281,10 +281,10 @@ list_GT_gag_AUG <- c("GAAGGAGAGAGATGG")
 
 list_GT_gag_down <- c("GGTGCGAGAGCGTCG")
 
-data <- data %>% 
+data <- data %>%
   mutate(
     D1_type_revised = ifelse((spliced == "spliced" & D1_type != "Alternative D1"), D1_type, NA)
-  ) %>% 
+  ) %>%
   mutate(
     D1_type_revised = case_when(
       (spliced == "spliced" & (alternative_d1_used_common %in% list_GC_1)) ~ "GC 3 base downstream of DIS",
@@ -294,11 +294,11 @@ data <- data %>%
       (spliced == "spliced" & alternative_d1_used_common != "None") ~ "Others",
       T ~ D1_type_revised
     ),
-    D1_type = ff_label(D1_type, "D1 types"), 
+    D1_type = ff_label(D1_type, "D1 types"),
     final_des = factor(final_des, levels = c("A3", "A4", "A5", "A7", "vif", "vpr", "Incomplete")),
     final_des = ff_label(final_des, "Final Destinations"),
     D1_type_revised = factor(
-      D1_type_revised, 
+      D1_type_revised,
       levels = c(
         "GC 3 base downstream of DIS",
         "GC 10 base downstream of DIS",
@@ -315,10 +315,10 @@ data <- data %>%
 
 
 # for inspections
-data %>% filter( spliced == "spliced" ) %>% 
+data %>% filter( spliced == "spliced" ) %>%
   tableby(~ D1_type, data = .) %>% summary(title = "D1 Type of splice isoforms")
 
-data %>% filter( spliced == "spliced" ) %>% 
+data %>% filter( spliced == "spliced" ) %>%
   tableby(~ D1_type_revised, data = .) %>% summary(title = "D1 Type of splice isoforms (detailed types)")
 ```
 
@@ -327,16 +327,16 @@ data %>% filter( spliced == "spliced" ) %>%
 ```{r}
 data %>% filter(
   spliced == "spliced"
-) %>% 
-  count(D1_type_revised) %>% 
-  mutate(percent_d1_type = 100 * n/sum(n)) %>% 
+) %>%
+  count(D1_type_revised) %>%
+  mutate(percent_d1_type = 100 * n/sum(n)) %>%
   ggplot(aes(x = D1_type_revised, y = percent_d1_type, fill = D1_type_revised)) +
   geom_col() +
   scale_fill_nejm(name = "D1 types") +
     labs(y = "Percentage", x = "Type of D1", title =
          "Types of D1 used") +
   scale_y_continuous(limits = c(0,110)) +
-  theme(axis.text = element_blank()) + 
+  theme(axis.text = element_blank()) +
   geom_text(aes(label = paste0(round(percent_d1_type), "%")), size = 3, vjust = -0.5)
 
 ```
@@ -359,9 +359,9 @@ data %>% filter(
 
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
 
-## Splice Isoforms 
+## Splice Isoforms
 
-### Splice Isoforms by Major D1 types 
+### Splice Isoforms by Major D1 types
 
 ```{r, results = "asis"}
 data %>% tableby( D1_type ~ splice_cat2 , data = .) %>% summary(
@@ -381,7 +381,7 @@ data %>% tableby( D1_type_revised ~ splice_cat2 , data = .) %>% summary(
 
 ## Acceptors After D1
 
-### By Major D1 Types 
+### By Major D1 Types
 
 ```{r, results = 'asis'}
 
@@ -393,14 +393,14 @@ data %>% tableby( D1_type ~ main_acceptor_after_d1 , data = .) %>% summary(
 <div style="margin-top: 4em;"></div>
 
 ```{r}
-data %>% 
-  filter(spliced == "spliced") %>% 
+data %>%
+  filter(spliced == "spliced") %>%
   ggplot(
     aes(x = D1_type, fill = main_acceptor_after_d1)
-  ) + 
-  geom_bar(position = "fill") + 
+  ) +
+  geom_bar(position = "fill") +
   scale_fill_nejm(name = "Main Acceptor\nAfter D1") +
-  labs(y = "Proportion", 
+  labs(y = "Proportion",
        x = "D1 types")
 
 ```
@@ -417,14 +417,14 @@ data %>% tableby( D1_type_revised ~ main_acceptor_after_d1 , data = .) %>% summa
 <div style="margin-top: 4em;"></div>
 
 ```{r}
-data %>% 
-  filter(spliced == "spliced") %>% 
+data %>%
+  filter(spliced == "spliced") %>%
   ggplot(
     aes(x = D1_type_revised, fill = main_acceptor_after_d1)
-  ) + 
-  geom_bar(position = "fill") + 
+  ) +
+  geom_bar(position = "fill") +
   scale_fill_nejm(name = "Main Acceptor\nAfter D1") +
-  labs(y = "Proportion", x = "D1 types") + 
+  labs(y = "Proportion", x = "D1 types") +
   theme(axis.text.x = element_text(angle = 90))
 
 ```
@@ -433,7 +433,7 @@ data %>%
 
 ## Final Destination Summary
 
-### By Major D1 Types 
+### By Major D1 Types
 
 ```{r, results = 'asis'}
 
@@ -456,11 +456,11 @@ data %>% tableby( D1_type_revised ~ final_des , data = .) %>% summary(
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
 
 
-## Final Destinations by splice flows 
+## Final Destinations by splice flows
 
 ::: {.callout-note}
 "Others" in D1 type are excluded in this analysis.
-::: 
+:::
 
 ```{r}
 summarize_splice_flow <- function(des) {
@@ -504,36 +504,36 @@ for (des in c("A3", "A4", "A5", "A7", "vif", "vpr")) {
 ### Splicing cascade alluvial plot
 
 ```{r}
-df_alluvium <- data %>% group_by(splice_cat2) %>% 
+df_alluvium <- data %>% group_by(splice_cat2) %>%
   mutate(splice_category_count = n())
 
 df_alluvium %>% filter(
   splice_cat2 != "Incomplete",
-  splice_cat2 != "Unspliced") %>% 
+  splice_cat2 != "Unspliced") %>%
   select(c(15:26)) %>% select(-final_des, -step8c) %>% unique() -> df_alluvium_short
 
 n <- df_alluvium_short$splice_category_count %>% sum()
 cut_off_to_show = n * 0.03
-df_alluvium_transformed <- df_alluvium_short %>% pivot_longer(cols = 1:8, names_to = "Steps") 
+df_alluvium_transformed <- df_alluvium_short %>% pivot_longer(cols = 1:8, names_to = "Steps")
 # df_alluvium_transformed %>% write_csv("cascade_data.csv")
-df_alluvium_transformed %>% 
-  ggplot(aes(x = Steps, 
+df_alluvium_transformed %>%
+  ggplot(aes(x = Steps,
              stratum = value,
              alluvium = splice_cat2,
-             y = splice_category_count, 
+             y = splice_category_count,
              label = value)) +
   geom_flow(aes(fill = splice_cat2), stat="alluvium", lode.guidance="forward", alpha=0.6) +
   new_scale_fill() +
   geom_stratum(data = subset(df_alluvium_transformed, !is.na(value)),
              aes(fill=value), color = "black") +
-  geom_text(stat = "stratum", 
-            size = 2) + 
+  geom_text(stat = "stratum",
+            size = 2) +
             #aes(label = ifelse(..count.. > cut_off_to_show, as.character(stratum), ""))) +
   theme_bw() + theme(legend.position = "none") +
   labs(
     x = "",
     y = "UMI count"
-  ) 
+  )
 
 
 ```
@@ -615,8 +615,8 @@ data %>% filter(
     TRUE ~ "Spliced at D2/D2b"
   ),
   A1_fate = factor(
-    A1_fate, 
-    levels = c("Spliced at D2/D2b", 
+    A1_fate,
+    levels = c("Spliced at D2/D2b",
                "No splicing after A1/vif",
                "Incomplete",
                "Sequence after D2/D2b unrecognized")),
@@ -626,7 +626,7 @@ data %>% filter(
 data_A1 %>% tableby(~ A1_fate, data = .) %>% summary()
 ```
 
-::: {.callout-tip} 
+::: {.callout-tip}
 
 The category ***"Sequence after D2/D2b unrecognized"*** comes from:
 
@@ -669,8 +669,8 @@ data %>% filter(
     TRUE ~ "Spliced at D3",
   ),
   A2_fate = factor(
-    A2_fate, 
-    levels = c("Spliced at D3", 
+    A2_fate,
+    levels = c("Spliced at D3",
                "No splicing after A2/vpr",
                "Incomplete",
                "Sequence after D3 too short/unrecognized")),
@@ -678,11 +678,11 @@ data %>% filter(
 ) -> data_A2
 
 data_A2 %>% mutate(
-  upstream_event = ifelse(main_acceptor_after_d1 == "A1", "D1->A1->A2", "D1->A2")) %>% 
+  upstream_event = ifelse(main_acceptor_after_d1 == "A1", "D1->A1->A2", "D1->A2")) %>%
   tableby(upstream_event ~ A2_fate, data = .) %>% summary()
 ```
 
-::: {.callout-tip} 
+::: {.callout-tip}
 
 The category ***"Sequence after D3 too short/unrecognized" ***comes from:
 
@@ -699,7 +699,7 @@ It is possible the ***Incomplete*** group can also come from short reads in Rand
 ## Splice Map (TBD)
 
 Generate JSON string named "link", which can be used in JavaScript directly
-```{r}
+```{r, echo=FALSE, results='asis'}
 spliced_data = data %>% filter(spliced == "spliced") %>% count(splice_category_2)
 total_spliced = spliced_data$n %>% sum()
 
@@ -734,16 +734,225 @@ splice_step_list <- pmap_dfr(spliced_data, function(splice_category_2, n) {
   return(return_tibble)
 })
 
-link <- splice_step_list %>% 
-  group_by(from, to) %>% 
-  mutate(total = sum(w)) %>% 
-  ungroup() %>% select(-w) %>% unique() %>% 
-  mutate(w = total, 
+link <- splice_step_list %>%
+  group_by(from, to) %>%
+  mutate(total = sum(w)) %>%
+  ungroup() %>% select(-w) %>% unique() %>%
+  mutate(w = total,
          total_spliced = total_spliced,
-         percent = round(100 * w/total_spliced, 1)) %>% 
+         percent = round(100 * w/total_spliced, 1)) %>%
   select(-total, -total_spliced) %>% arrange(from, to)
 
-link <- toJSON(link, dataframe = "rows")
+link <- toJSON(link, dataframe = "rows", auto_unbox=TRUE)
+cat(sprintf('<script>window.links = %s;</script>', link))
+```
 
-cat(link)
+```{=html}
+<!-- Arc-style chord diagram (static labels, scoped safely) -->
+<style>
+  #splice-map .wrap{padding:16px}
+  #splice-map svg{width:100%;height:620px;background:#f6f9fc;}
+  #splice-map .axis line,#splice-map .axis path{stroke:#555}
+  #splice-map .tick text{fill:#333;font-size:12px}
+  #splice-map .anchor text{font-size:12px;dominant-baseline:hanging}
+  #splice-map .link{fill:none;stroke-opacity:.25;pointer-events:stroke}
+  #splice-map .link:hover{stroke-opacity:.9}
+  #splice-map .highlight{stroke-opacity:.95!important}
+  #splice-map .arc-label{
+    font:12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    fill:#111;
+    paint-order:stroke;stroke:#fff;stroke-width:3px;
+    pointer-events:none;
+  }
+  #splice-map,
+#splice-map .wrap,
+#splice-map svg {
+  overscroll-behavior: contain; /* keep wheel/pinch from bubbling to page */
+}
+
+#splice-map .wrap {
+  overflow: hidden; /* hide any horizontal scrollbar flash in the container */
+}
+</style>
+
+<div id="splice-map">
+  <div class="wrap">
+    <svg id="c"></svg>
+  </div>
+</div>
+
+<script src="https://unpkg.com/d3@7"></script>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  const root = d3.select("#splice-map");
+  const wrap = root.select(".wrap").node();
+  const W = Math.max(800, wrap.clientWidth),
+        H = 560,
+        M = {t:40,r:24,b:60,l:24},
+        innerW = W - M.l - M.r,
+        innerH = H - M.t - M.b,
+        baselineY = innerH / 2;
+
+  // --- Data ---
+  const anchors = [
+    {id:"D1",pos:900},{id:"D2",pos:5100},{id:"D3", pos:5500},{id:"A1",pos:4800},{id:"A2",pos:5400},
+    {id:"A3",pos:5700},{id:"A4",pos:5900},{id:"A5",pos:6000},{id:"A7",pos:8200}
+  ];
+  const cfg = {
+    colors:{D1:"#4a90e2",D2:"#f5a623",D3:"#999",D4:"#777"},
+    directionsUp:["D1","A2"],
+    // links:[
+    //   {from:"D1",to:"A1",w:7,label:"D1_A2_D3_A4 7%"},
+    //   {from:"D1",to:"A1",w:5,label:"D1_A1 5%"},
+    //   {from:"D1",to:"A1",w:4,label:"D1_A1 4%"},
+    //   {from:"D1",to:"A7",w:3,label:"D1_A7 3%"},
+    //   {from:"D1",to:"A2",w:3,label:"D1_A2 3%"},
+    //   {from:"D1",to:"A3",w:3,label:"D1_A3 3%"},
+    //   {from:"D1",to:"A4",w:3,label:"D1_A4 3%"},
+    //   {from:"D2",to:"A4",w:3,label:"D2_A4 3%"},
+    //   {from:"D2",to:"A5",w:3,label:"D2_A5 3%"},
+    //   {from:"D2",to:"A6",w:3,label:"D2_A6 3%"},
+    //   {from:"D2",to:"A7",w:3,label:"D2_A7 3%"}
+    // ]
+  };
+  const dir = f => cfg.directionsUp.includes(f) ? "up" : "down";
+
+  let links = Array.isArray(window.links) ? window.links : [];
+
+  // if empty, display message inside SVG and stop drawing
+  if (!links.length) {
+    const svg = d3.select("#c")
+      .attr("viewBox", "0 0 800 200")
+      .attr("preserveAspectRatio", "xMidYMid meet");
+
+    svg.append("text")
+      .attr("x", "50%")
+      .attr("y", "50%")
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "middle")
+      .attr("fill", "#777")
+      .attr("font-size", 20)
+      .text("No links found");
+
+    return;
+  }
+
+  const maxPercent = d3.max(links, d => d.percent);
+
+  // if the widths are too subtle, change to .range([1,20])
+  const widthScale = d3.scaleSqrt()
+    .domain([0, maxPercent])
+    .range([1, 15]);
+
+  links = links.map(l => ({
+    ...l,
+    label: `${l.from}➞${l.to}`,
+    strokeWidth: widthScale(l.percent)
+  }));
+
+  // console.log({links});
+
+  // --- Setup ---
+  const svg = root.select("#c")
+    .attr("viewBox",`0 0 ${W} ${H}`)
+    .attr("preserveAspectRatio","xMidYMid meet");
+  const g = svg.append("g").attr("transform",`translate(${M.l},${M.t})`);
+
+  const x = d3.scaleLinear().domain([0,9000]).range([0,innerW]);
+  const xAxis = d3.axisBottom(x).ticks(9).tickSizeOuter(0);
+
+  const axisG = g.append("g").attr("transform",`translate(0,${baselineY})`);
+  axisG.append("line")
+    .attr("x1",0).attr("x2",innerW).attr("y1",0).attr("y2",0)
+    .attr("stroke","#333").attr("stroke-width",1.25);
+  axisG.selectAll(".v")
+    .data(d3.range(0,9001,1000))
+    .join("line")
+    .attr("class","v")
+    .attr("x1",d=>x(d)).attr("x2",d=>x(d))
+    .attr("y1",-innerH/2).attr("y2",innerH/2)
+    .attr("stroke","#fff").attr("stroke-width",1).attr("opacity",.6);
+
+  g.append("g").attr("class","axis")
+    .attr("transform",`translate(0,${baselineY})`)
+    .call(xAxis);
+  g.append("text")
+    .attr("x",innerW/2).attr("y",H - M.t - 6)
+    .attr("text-anchor","middle").attr("fill","#333")
+    .text("HXB2 genome position (nt)");
+
+  const A = Object.fromEntries(anchors.map(a=>[a.id,a]));
+  const anchorNodes = g.append("g").attr("class","anchor").selectAll("g")
+    .data(anchors).join("g")
+    .attr("transform", d => `translate(${x(d.pos)},${baselineY})`);
+  anchorNodes.append("circle")
+    .attr("r",4.5).attr("fill","#1f77b4").attr("stroke","#0b3a6f").attr("stroke-width",1.25);
+  anchorNodes.append("text")
+    .attr("y",12).attr("text-anchor","middle").attr("fill","#333").text(d=>d.id);
+
+  // --- Arc path generator ---
+  const arcPath = (x0,x1,d="up",k=.33) => {
+    const mid=(x0+x1)/2, s = d==="down"?1:-1, h = Math.max(40, Math.abs(x1-x0)*k);
+    return `M${x0},${baselineY} Q${mid},${baselineY + s*h} ${x1},${baselineY}`;
+  };
+
+  // --- Links + labels ---
+  const w = d3.scaleLinear()
+    .domain(d3.extent(links, d=>d.w))
+    .range([2,10]);
+  const linkG = g.append("g").attr("class","links");
+
+  const linkPaths = linkG.selectAll("path")
+    .data(links)
+    .join("path")
+      .attr("class","link")
+      .attr("id", (_,i)=>`arc-${i}`)
+      .attr("stroke", d=>cfg.colors[d.from] || "#888")
+      .attr("stroke-width", d=>d.strokeWidth)
+      .attr("d", d=>{
+        const x0=x(A[d.from].pos), x1=x(A[d.to].pos);
+        const j=(Math.random()*0.08)-0.04;
+        return arcPath(x0,x1,dir(d.from),0.33+j);
+      })
+    .append("title")
+      .text(d=>`${d.label || `${d.from}→${d.to}`}  (w=${d.w})`);
+
+  const labelsG = g.append("g").attr("class","labels");
+  labelsG.selectAll("text")
+    .data(links)
+    .join("text")
+      .attr("class","arc-label")
+      .attr("dy", d => dir(d.from)==="up" ? -6 : 14)
+    .append("textPath")
+      .attr("href",(_,i)=>`#arc-${i}`)
+      .attr("startOffset","50%")
+      .attr("text-anchor","middle")
+      .text(d=>d.label || `${d.from}→${d.to}`);
+
+  // --- Legend ---
+  const legend = svg.append("g").attr("transform",`translate(${W-190},${M.t})`);
+  [...new Set(links.map(d=>d.from))].forEach((k,i)=>{
+    const lg = legend.append("g").attr("transform",`translate(0,${i*20})`);
+    lg.append("line").attr("x1",0).attr("x2",20).attr("y1",8).attr("y2",8)
+      .attr("stroke",cfg.colors[k]||"#888").attr("stroke-width",6);
+    lg.append("text").attr("x",28).attr("y",12).attr("fill","#333").text(k);
+  });
+
+  // --- Zoom & Pan (x-axis only) ---
+  const zoomed = e => {
+    const zx = e.transform.rescaleX(x);
+    g.select(".axis").call(xAxis.scale(zx));
+    anchorNodes.attr("transform", d => `translate(${zx(d.pos)},${baselineY})`);
+    g.selectAll(".link")
+      .attr("d", d => arcPath(zx(A[d.from].pos), zx(A[d.to].pos), dir(d.from), .33));
+    axisG.selectAll(".v").attr("x1",d=>zx(d)).attr("x2",d=>zx(d));
+  };
+  svg.call(
+    d3.zoom()
+      .scaleExtent([1,20])
+      .translateExtent([[0,0],[innerW,innerH]])
+      .on("zoom", zoomed)
+  );
+});
+</script>
 ```
