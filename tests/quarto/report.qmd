@@ -748,7 +748,8 @@ cat(sprintf('<script>window.links = %s;</script>', link))
 ```
 
 ```{=html}
-<!-- Arc-style chord diagram (static labels, scoped safely) -->
+<!-- Arc-style chord diagram with HXB2 gene map aligned to x-scale -->
+<!-- Arc-style chord diagram with HXB2 gene map aligned to the x-scale -->
 <style>
   #splice-map .wrap{padding:16px}
   #splice-map svg{width:100%;height:620px;background:#f6f9fc;}
@@ -757,14 +758,12 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   #splice-map .anchor text{font-size:12px;dominant-baseline:hanging}
   #splice-map .link{fill:none;stroke-opacity:.25;pointer-events:stroke}
   #splice-map .link:hover{stroke-opacity:.9}
-  #splice-map .highlight{stroke-opacity:.95!important}
   #splice-map .arc-label{
     font:14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
     fill:#111;
     paint-order:stroke;stroke:#fff;stroke-width:3px;
     pointer-events:none;
   }
-
   /* stop page scroll while zooming */
   #splice-map, #splice-map .wrap, #splice-map svg { overscroll-behavior: contain; }
   #splice-map .wrap { overflow: hidden; }
@@ -790,36 +789,27 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // --- Data ---
   const anchors = [
-    {id:"D1",pos:900},{id:"D2",pos:5100},{id:"D3", pos:5500},{id:"A1",pos:4800},{id:"A2",pos:5400},
-    {id:"A3",pos:5700},{id:"A4",pos:5900},{id:"A5",pos:6000},{id:"A7",pos:8200}
+    {id:"D1",pos:900},{id:"D2",pos:5100},{id:"D3",pos:5500},
+    {id:"A1",pos:4800},{id:"A2",pos:5400},{id:"A3",pos:5700},
+    {id:"A4",pos:5900},{id:"A5",pos:6000},{id:"A7",pos:8200}
   ];
-  const cfg = {
-    colors:{D1:"#4a90e2",D2:"#f5a623",D3:"#999",D4:"#777"},
-    directionsUp:["D1","A2"]
-  };
-  const dir = f => cfg.directionsUp.includes(f) ? "up" : "down";
+  const cfg = { colors:{D1:"#4a90e2",D2:"#f5a623",D3:"#999",D4:"#777"} };
+  const dir = () => "down"; // force all arcs downward
 
   let links = Array.isArray(window.links) ? window.links : [];
-
   if (!links.length) {
     const svg = d3.select("#c")
-      .attr("viewBox", "0 0 800 200")
-      .attr("preserveAspectRatio", "xMidYMid meet");
-
+      .attr("viewBox","0 0 800 200").attr("preserveAspectRatio","xMidYMid meet");
     svg.append("text")
-      .attr("x", "50%")
-      .attr("y", "50%")
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "middle")
-      .attr("fill", "#777")
-      .attr("font-size", 20)
+      .attr("x","50%").attr("y","50%").attr("text-anchor","middle")
+      .attr("dominant-baseline","middle").attr("fill","#777").attr("font-size",20)
       .text("No links found");
     return;
   }
 
+  // stroke width from percent (perceptual)
   const maxPercent = d3.max(links, d => d.percent);
   const widthScale = d3.scaleSqrt().domain([0, maxPercent]).range([1, 15]);
-
   links = links.map(l => ({
     ...l,
     label: `${l.from}➞${l.to} ${l.percent}%`,
@@ -832,51 +822,71 @@ window.addEventListener('DOMContentLoaded', () => {
     .attr("preserveAspectRatio","xMidYMid meet");
   const g = svg.append("g").attr("transform",`translate(${M.l},${M.t})`);
 
-  // >>>>>>> PIECEWISE SCALE WITH STRETCH ON [4500, 6000] <<<<<<<
-  const focusStart = 4500, focusEnd = 6000, stretch = 2; // make middle 2× wider
-  const L1 = focusStart - 0;         // 0..4500
-  const L2 = focusEnd - focusStart;  // 4500..6000
-  const L3 = 9000 - focusEnd;        // 6000..9000
-
-  const W1 = L1;           // normal
-  const W2 = L2 * stretch; // stretched
-  const W3 = L3;           // normal
-
-  const totalWeighted = W1 + W2 + W3;
+  // ---- Piecewise x-scale with stretch on [4500, 6000]; full HXB2 to 9719 ----
+  const genomeMax = 9719;
+  const focusStart = 4500, focusEnd = 6000, stretch = 2;
+  const L1 = focusStart, L2 = focusEnd - focusStart, L3 = genomeMax - focusEnd;
+  const totalWeighted = L1 + L2 * stretch + L3;
   const unit = innerW / totalWeighted;
+  const r1 = L1 * unit, r2 = r1 + (L2 * stretch) * unit, r3 = r2 + L3 * unit;
 
-  const r0 = 0;
-  const r1 = r0 + W1 * unit;        // mapped position for 4500
-  const r2 = r1 + W2 * unit;        // mapped position for 6000
-  const r3 = r2 + W3 * unit;        // mapped position for 9000 (≈ innerW)
-
-  // Piecewise linear scale: domain breakpoints map to range breakpoints.
   const x = d3.scaleLinear()
-    .domain([0, focusStart, focusEnd, 9000])
+    .domain([0, focusStart, focusEnd, genomeMax])
     .range([0, r1, r2, r3]);
 
-  const xAxis = d3.axisBottom(x).ticks(9).tickSizeOuter(0);
+  // Axis in increments of 100
+  const tickVals = d3.range(0, genomeMax + 1, 250);
+  const xAxis = d3.axisBottom(x)
+    .tickValues(tickVals)
+    .tickFormat(d3.format("~d"))
+    .tickSizeOuter(0);
 
+  // --- Axis & grid ---
   const axisG = g.append("g").attr("transform",`translate(0,${baselineY})`);
   axisG.append("line")
     .attr("x1",0).attr("x2",innerW).attr("y1",0).attr("y2",0)
     .attr("stroke","#333").attr("stroke-width",1.25);
-  axisG.selectAll(".v")
-    .data(d3.range(0,9001,1000))
-    .join("line")
-    .attr("class","v")
-    .attr("x1",d=>x(d)).attr("x2",d=>x(d))
-    .attr("y1",-innerH/2).attr("y2",innerH/2)
-    .attr("stroke","#fff").attr("stroke-width",1).attr("opacity",.6);
 
-  g.append("g").attr("class","axis")
+  const grid = axisG.selectAll(".v")
+    .data(tickVals.filter(d => d % 1000 === 0)) // light verticals each 1000
+    .join("line")
+      .attr("class","v")
+      .attr("x1",d=>x(d)).attr("x2",d=>x(d))
+      .attr("y1",-innerH/2).attr("y2",innerH/2)
+      .attr("stroke","#fff").attr("stroke-width",1).attr("opacity",.6);
+
+  const xAxisG = g.append("g").attr("class","axis")
     .attr("transform",`translate(0,${baselineY})`)
     .call(xAxis);
+
   g.append("text")
     .attr("x",innerW/2).attr("y",H - M.t - 6)
     .attr("text-anchor","middle").attr("fill","#333")
     .text("HXB2 genome position (nt)");
 
+  // --- Gene-map image with left/right margin calibration ---
+  const imgURL = "https://www.hiv.lanl.gov/content/sequence/HIV/IMAGES/gene-map-hxb2-1200px.jpg";
+  const baseImgHeight = 110;
+  const imgY0 = baselineY - baseImgHeight - 10;
+
+  // Fractions of image width where genome 0 and 9719 land.
+  // Tweak u0/u1 slightly if you notice misalignment.
+  const imgCal = { u0: 0.07, u1: 0.97 };
+
+  // initial calibrated placement
+  const imgWidth0 = (x(genomeMax) - x(0)) / (imgCal.u1 - imgCal.u0);
+  const imgX0     = x(0) - imgCal.u0 * imgWidth0;
+
+  const img = g.append("image")
+    .attr("href", imgURL)
+    .attr("x", imgX0)
+    .attr("y", imgY0)
+    .attr("width", imgWidth0)
+    .attr("height", baseImgHeight)
+    .attr("preserveAspectRatio", "none")
+    .style("pointer-events","none");
+
+  // --- Anchors (for dots & ids) ---
   const A = Object.fromEntries(anchors.map(a=>[a.id,a]));
   const anchorNodes = g.append("g").attr("class","anchor").selectAll("g")
     .data(anchors).join("g")
@@ -886,15 +896,14 @@ window.addEventListener('DOMContentLoaded', () => {
   anchorNodes.append("text")
     .attr("y",12).attr("text-anchor","middle").attr("fill","#333").text(d=>d.id);
 
-  // --- Arc path generator ---
-  const arcPath = (x0,x1,d="up",k=.33) => {
-    const mid=(x0+x1)/2, s = d==="down"?1:-1, h = Math.max(40, Math.abs(x1-x0)*k);
+  // --- Arc path (down) ---
+  const arcPath = (x0,x1,_="down",k=.33) => {
+    const mid=(x0+x1)/2, s=1, h=Math.max(40, Math.abs(x1-x0)*k);
     return `M${x0},${baselineY} Q${mid},${baselineY + s*h} ${x1},${baselineY}`;
   };
 
   // --- Links + labels ---
   const linkG = g.append("g").attr("class","links");
-
   linkG.selectAll("path")
     .data(links)
     .join("path")
@@ -905,41 +914,57 @@ window.addEventListener('DOMContentLoaded', () => {
       .attr("d", d=>{
         const x0=x(A[d.from].pos), x1=x(A[d.to].pos);
         const j=(Math.random()*0.08)-0.04;
-        return arcPath(x0,x1,dir(d.from),0.33+j);
-      })
-    .append("title")
-      .text(d=>`${d.label} (w=${d.w}${d.percent!=null?`, ${d.percent}%`:''})`);
+        return arcPath(x0,x1,"down",0.33+j);
+      });
 
   const labelsG = g.append("g").attr("class","labels");
   labelsG.selectAll("text")
     .data(links)
     .join("text")
       .attr("class","arc-label")
-      .attr("dy", d => dir(d.from)==="up" ? -6 : 14)
+      .attr("dy", 14)
     .append("textPath")
       .attr("href",(_,i)=>`#arc-${i}`)
       .attr("startOffset","50%")
       .attr("text-anchor","middle")
       .text(d=>d.label);
 
-  // --- Legend ---
-  const legend = svg.append("g").attr("transform",`translate(${W-190},${M.t})`);
-  [...new Set(links.map(d=>d.from))].forEach((k,i)=>{
-    const lg = legend.append("g").attr("transform",`translate(0,${i*20})`);
-    lg.append("line").attr("x1",0).attr("x2",20).attr("y1",8).attr("y2",8)
-      .attr("stroke",cfg.colors[k]||"#888").attr("stroke-width",6);
-    lg.append("text").attr("x",28).attr("y",12).attr("fill","#333").text(k);
-  });
-
   // --- Zoom & Pan (x-axis only) ---
   const zoomed = e => {
     const zx = e.transform.rescaleX(x);
-    g.select(".axis").call(xAxis.scale(zx));
+    const k = e.transform.k;
+
+    // axis & grid
+    xAxisG.call(
+      d3.axisBottom(zx)
+        .tickValues(tickVals)
+        .tickFormat(d3.format("~d"))
+        .tickSizeOuter(0)
+    );
+    grid.attr("x1",d=>zx(d)).attr("x2",d=>zx(d));
+
+    // anchors
     anchorNodes.attr("transform", d => `translate(${zx(d.pos)},${baselineY})`);
+
+    // links
     g.selectAll(".link")
-      .attr("d", d => arcPath(zx(A[d.from].pos), zx(A[d.to].pos), dir(d.from), .33));
-    axisG.selectAll(".v").attr("x1",d=>zx(d)).attr("x2",d=>zx(d));
+      .attr("d", d => arcPath(zx(A[d.from].pos), zx(A[d.to].pos), "down", .33));
+
+    // image: keep calibrated and scale height with zoom
+    const wScaled = (zx(genomeMax) - zx(0)) / (imgCal.u1 - imgCal.u0);
+    const xScaled = zx(0) - imgCal.u0 * wScaled;
+    const newH = baseImgHeight * k;
+
+    img
+      .attr("x", xScaled)
+      .attr("width", wScaled)
+      .attr("y", imgY0 - (newH - baseImgHeight)) // grow upward
+      .attr("height", newH);
   };
+
+  // prevent page scroll while zooming
+  svg.node().addEventListener('wheel', e => e.preventDefault(), { passive:false });
+
   svg.call(
     d3.zoom()
       .scaleExtent([1,20])
