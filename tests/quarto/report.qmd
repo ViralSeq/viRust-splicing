@@ -20,6 +20,7 @@ format:
     embed-resources: true
     fig-width: 8
     fig-height: 6
+    page-layout: full
 execute:
   echo: false              # hide all code by default
   warning: false
@@ -698,7 +699,7 @@ It is possible the ***Incomplete*** group can also come from short reads in Rand
 
 ## Splice Map
 
-A splice event map showing the percent of reads with Dx->Ax event. 
+A splice event map showing the percent of reads with Dx->Ax event.
 
 ```{r, echo=FALSE, results='asis'}
 spliced_data = data %>% filter(spliced == "spliced") %>% count(splice_category_2)
@@ -750,7 +751,7 @@ cat(sprintf('<script>window.links = %s;</script>', link))
 
 ```{=html}
 <style>
-  #splice_map{max-width:1200px;margin:18px auto;padding:0 16px;}
+  #splice_map{width:100%;margin:18px auto;padding:0 16px;}
   #splice_map .board{position:relative;background:var(--panel);border:1px solid #23314a;border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.35)}
   #splice_map svg{width:100%;height:680px;display:block}
   #splice_map .axis line,.axis path{stroke:#cdd3e1}
@@ -760,11 +761,14 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   #splice_map .feat text{font-size:18; fill:#0b1220; font-weight:600; paint-order:stroke; stroke:#ffffff; stroke-width:3px}
   #splice_map .link{fill:none;stroke-opacity:.35;pointer-events:stroke}
   #splice_map .link:hover{stroke-opacity:.9}
-  #splice_map .arc-label{font:18px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; fill:#0b1220; paint-order:stroke; stroke:#ffffff; stroke-width:3px; pointer-events:none;}
+  #splice_map .arc-label{font:16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; fill:#0b1220; paint-order:stroke; stroke:#ffffff; stroke-width:3px; pointer-events:none;}
   #splice_map .board, #splice_map svg { overscroll-behavior: contain; }
+
+  /* NEW: anchor labels above axis */
+  #splice_map .anchor-label{fill:#dbe3f5;font-size:14px;text-shadow:0 1px 0 #0b1220}
+  #splice_map .anchor-stem{stroke:#cdd3e1;stroke-width:1;opacity:.65}
 </style>
-</head>
-<body>
+
 <div id="splice_map" class="wrap">
   <div class="board">
     <svg id="stage"></svg>
@@ -777,49 +781,29 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   // ========= DATA ===========================================================
   const GENOME_MAX = 9719;
 
-  const rowLabels = {
-    1: "ORF1",
-    2: "ORF2",
-    3: "ORF3",
-    4: "LTRs"
-  };
-
-  // test comment
+  const rowLabels = {1:"ORF1",2:"ORF2",3:"ORF3",4:"LTRs"};
 
   const C = {
     gag:"#6aa0e6", pol:"#d63b3b", env:"#f4be12",
-    sub:"#6aa0e6", 
-    vif:"#94c973", 
-    ltr:"#aaaaaa", 
-    tat:"#448f71ff", 
-    rev:"#ec6fcfff", 
-    nef:"#9a0b79ff", 
-    vpu:"#c0d5f9ff",
-    vpr:"#84a0d2ff",
+    vif:"#94c973", ltr:"#aaaaaa",
+    tat:"#448f71ff", rev:"#ec6fcfff",
+    nef:"#9a0b79ff", vpu:"#c0d5f9ff", vpr:"#84a0d2ff"
   };
 
   const features = [
-    // row 1 — Reading frame 1
-    { row:1, name:"Gag", start: 790,  end: 2292, color:C.gag },
-    { row:1, name:"vif", start: 5041, end: 5619, color:C.vif },
-    { row:1, name:"tat-2", start: 8379, end: 8424, color:C.tat },
-    { row:1, name:"nef", start: 8797, end: 9417, color:C.nef },
-
-
-    // row 2 — Reading frame 2
-    { row:2, name:"tat-1", start: 5831, end: 6045, color:C.tat },
-    { row:2, name:"vpu", start: 6062, end: 6310, color:C.vpu },
-    { row:2, name:"rev-2", start: 8379, end: 8653, color:C.rev },
-
-    // row 3 — accessory/regulatory (simplified spans)
-    { row:3, name:"Pol", start: 2085, end: 5096, color:C.pol },
-    { row:3, name:"vpr", start: 5559, end: 5850, color:C.vpr },
-    { row:3, name:"rev-1", start: 5970, end: 6045, color:C.rev },
-    { row:3, name:"Env", start: 6225, end: 8795, color:C.env },    
-
-    // row 4 — LTRs
-    { row:1, name:"5'-LTR", start: 1, end: 634, color:C.ltr },
-    { row:2, name:"3'-LTR", start: 9407, end: GENOME_MAX, color:C.ltr }
+    {row:1,name:"Gag",start:790,end:2292,color:C.gag},
+    {row:1,name:"vif",start:5041,end:5619,color:C.vif},
+    {row:1,name:"tat-2",start:8379,end:8424,color:C.tat},
+    {row:1,name:"nef",start:8797,end:9417,color:C.nef},
+    {row:2,name:"tat-1",start:5831,end:6045,color:C.tat},
+    {row:2,name:"vpu",start:6062,end:6310,color:C.vpu},
+    {row:2,name:"rev-2",start:8379,end:8653,color:C.rev},
+    {row:3,name:"Pol",start:2085,end:5096,color:C.pol},
+    {row:3,name:"vpr",start:5559,end:5850,color:C.vpr},
+    {row:3,name:"rev-1",start:5970,end:6045,color:C.rev},
+    {row:3,name:"Env",start:6225,end:8795,color:C.env},
+    {row:1,name:"5'-LTR",start:1,end:634,color:C.ltr},
+    {row:2,name:"3'-LTR",start:9407,end:GENOME_MAX,color:C.ltr}
   ];
 
   const anchors = [
@@ -828,219 +812,202 @@ cat(sprintf('<script>window.links = %s;</script>', link))
     {id:"A4",pos:5955},{id:"A5",pos:5977},{id:"A7",pos:8379}
   ];
 
-  // Provide your own links via window.links, else demo:
-  let links = Array.isArray(window.links) ? window.links : [
-    {id:"L1", from:"D1", to:"A1", percent:6.2},
-    {id:"L2", from:"D1", to:"A2", percent:4.8},
-    {id:"L3", from:"D2", to:"A3", percent:2.9},
-    {id:"L4", from:"D2", to:"A4", percent:3.5},
-    {id:"L5", from:"D3", to:"A5", percent:1.7},
-    {id:"L6", from:"D3", to:"A7", percent:2.1}
+  let links = Array.isArray(window.links)?window.links:[
+    {id:"L1",from:"D1",to:"A1",percent:6.2},
+    {id:"L2",from:"D1",to:"A2",percent:4.8},
+    {id:"L3",from:"D2",to:"A3",percent:2.9},
+    {id:"L4",from:"D2",to:"A4",percent:3.5},
+    {id:"L5",from:"D3",to:"A5",percent:1.7},
+    {id:"L6",from:"D3",to:"A7",percent:2.1}
   ];
 
   // ========= SCAFFOLD =======================================================
-  const W = 1200, H = 680, M = {t:30, r:24, b:80, l:80};
-  const innerW = W - M.l - M.r, innerH = H - M.t - M.b;
+  const W=1200,H=680,M={t:30,r:24,b:80,l:80};
+  const innerW=W-M.l-M.r,innerH=H-M.t-M.b;
 
-  const svg = d3.select("#stage")
-    .attr("viewBox", `0 0 ${W} ${H}`)
-    .attr("preserveAspectRatio", "xMidYMid meet");
+  const svg=d3.select("#stage").attr("viewBox",`0 0 ${W} ${H}`).attr("preserveAspectRatio","xMidYMid meet");
+  const g=svg.append("g").attr("transform",`translate(${M.l},${M.t})`);
 
-  const g = svg.append("g").attr("transform", `translate(${M.l},${M.t})`);
+  const x=d3.scaleLinear().domain([0,GENOME_MAX]).range([0,innerW]).clamp(true);
 
-  // Scale clamped to [0, GENOME_MAX]
-  const x = d3.scaleLinear()
-    .domain([0, GENOME_MAX])
-    .range([0, innerW])
-    .clamp(true);
+  // tighter spacing between rows ↓↓↓
+  const rows=[...new Set(features.map(d=>+d.row))].sort((a,b)=>a-b);
+  const rowBand=d3.scaleBand().domain(rows).range([0,innerH*0.55]).paddingInner(0.15).paddingOuter(0.05);
 
-  // ----- derive rows dynamically -----
-  const rows = Array.from(new Set(features.map(d => +d.row))).sort((a,b)=>a-b);
-  const trackHeightPortion = 0.6; // top portion for rows
-  const rowBand = d3.scaleBand()
-    .domain(rows)
-    .range([0, innerH * trackHeightPortion])
-    .paddingInner(0.28)
-    .paddingOuter(0.1);
+  const baselineY=Math.round(innerH*0.62);
+  const arcAreaBottom=innerH;
 
-  const baselineY = Math.round(innerH * 0.62);
-  const arcAreaBottom = innerH;
-
-  // Axis & grid
-  let tickStep = 1000;
-  let tickVals = d3.range(0, GENOME_MAX + 1, tickStep);
-  if (!tickVals.includes(GENOME_MAX)) tickVals.push(GENOME_MAX); // ensure end tick
-
-  const axisG = g.append("g").attr("transform", `translate(0,${baselineY})`);
-  axisG.append("line")
-    .attr("x1",0).attr("x2",innerW).attr("y1",0).attr("y2",0)
-    .attr("stroke","#cdd3e1").attr("stroke-width",1.25);
-
-  const grid = g.append("g");
-  const xAxisG = g.append("g").attr("class","axis")
-    .attr("transform", `translate(0,${baselineY})`);
-
+  // Axis
+  const tickStep=1000;
+  const tickVals=d3.range(0,GENOME_MAX+1,tickStep);
+  const grid=g.append("g");
+  const xAxisG=g.append("g").attr("class","axis").attr("transform",`translate(0,${baselineY})`);
   function drawAxis(zx){
-    xAxisG.call(
-      d3.axisBottom(zx).tickValues(tickVals).tickFormat(d3.format("~d")).tickSizeOuter(0)
-    );
-    const gridVals = tickVals.filter(d => d % 1000 === 0 || d === GENOME_MAX);
-    const sel = grid.selectAll("line.v").data(gridVals, d=>d);
-    sel.enter().append("line")
-      .attr("class","v")
-      .attr("y1", rowBand.range()[0]) // top of row area
-      .attr("y2", arcAreaBottom)
-      .attr("stroke","#98a2b3").attr("stroke-width",1).attr("opacity",.35)
-      .merge(sel)
-      .attr("x1", d=>zx(d)).attr("x2", d=>zx(d));
-    sel.exit().remove();
+    xAxisG.call(d3.axisBottom(zx).tickValues(tickVals).tickFormat(d3.format("~d")).tickSizeOuter(0));
   }
   drawAxis(x);
 
-  // Row labels (optional)
-  if (Object.keys(rowLabels).length) {
-    g.append("g")
-      .selectAll("text")
-      .data(rows)
-      .join("text")
-        .attr("class","row-label")
-        .attr("x", -12)
-        .attr("y", d => rowBand(d) + rowBand.bandwidth()/2)
-        .attr("text-anchor","end")
-        .text(d => rowLabels[d] ?? `Row ${d}`);
-  }
-
   // ========= FEATURES =======================================================
-  const featuresG = g.append("g");
+  const featuresG=g.append("g");
 
   function renderFeatures(zx){
-    const byRow = d3.group(features, d => +d.row);
-    const rowGroups = featuresG.selectAll("g.row").data(rows, d => d)
-      .join(enter => enter.append("g").attr("class","row")
-        .attr("data-row", d => d)
-        .attr("transform", d => `translate(0, ${rowBand(d)})`)
-      );
+    const byRow=d3.group(features,d=>+d.row);
+    const rowGroups=featuresG.selectAll("g.row").data(rows,d=>d)
+      .join(enter=>enter.append("g").attr("class","row").attr("data-row",d=>d)
+        .attr("transform",d=>`translate(0,${rowBand(d)})`));
 
     rowGroups.each(function(rowNum){
-      const group = d3.select(this);
-      const feats = byRow.get(rowNum) || [];
-      const rowH = rowBand.bandwidth();
+      const group=d3.select(this);
+      const feats=byRow.get(rowNum)||[];
+      const rowH=rowBand.bandwidth();
 
-      const sel = group.selectAll("g.feat").data(feats, d => d.name);
-      const enter = sel.enter().append("g").attr("class","feat");
-      enter.append("rect");
-      enter.append("text").attr("dominant-baseline","middle");
-
-      const merged = enter.merge(sel);
+      const sel=group.selectAll("g.feat").data(feats,d=>d.name);
+      const enter=sel.enter().append("g").attr("class","feat");
+      enter.append("rect"); enter.append("text").attr("dominant-baseline","middle");
+      const merged=enter.merge(sel);
       merged.select("rect")
-        .attr("x", d => zx(d.start))
-        .attr("y", rowH*0.18)
-        .attr("width", d => Math.max(1, zx(d.end) - zx(d.start)))
-        .attr("height", rowH*0.64)
-        .attr("fill", d => d.color);
+        .attr("x",d=>zx(d.start))
+        .attr("y",rowH*0.18)
+        .attr("width",d=>Math.max(1,zx(d.end)-zx(d.start)))
+        .attr("height",rowH*0.64)
+        .attr("fill",d=>d.color);
       merged.select("text")
-        .attr("x", d => zx(d.start) + (zx(d.end)-zx(d.start))/2)
-        .attr("y", rowH*0.5)
+        .attr("x",d=>zx(d.start)+(zx(d.end)-zx(d.start))/2)
+        .attr("y",rowH*0.5)
         .attr("text-anchor","middle")
-        .text(d => d.name);
-
+        .text(d=>d.name);
       sel.exit().remove();
     });
   }
   renderFeatures(x);
 
-  // ========= ANCHORS ========================================================
-  const Amap = Object.fromEntries(anchors.map(a => [a.id, a]));
-  const anchorG = g.append("g");
-  const anchorNodes = anchorG.selectAll("g")
-    .data(anchors)
-    .join("g")
-      .attr("transform", d => `translate(${x(d.pos)},${baselineY})`);
-  anchorNodes.append("circle")
-    .attr("r",4.5).attr("fill","#1f77b4").attr("stroke","#0b3a6f").attr("stroke-width",1.25);
-  anchorNodes.append("text")
-    .attr("y",12).attr("text-anchor","middle").text(d=>d.id).attr("fill","#dbe3f5").attr("font-size",12);
+  // ========= FEATURE CONNECTIONS ============================================
+  // Connect tat-1→tat-2 and rev-1→rev-2 with simple lines
+  const connectors=[
+    {from:"tat-1",to:"tat-2"},
+    {from:"rev-1",to:"rev-2"}
+  ];
+  const connG=g.append("g").attr("class","connectors");
+  function renderConnectors(zx){
+    const data=connectors.map(c=>{
+      const f=features.find(d=>d.name===c.from);
+      const t=features.find(d=>d.name===c.to);
+      if(!f||!t) return null;
+      return {
+        x1:zx(f.end), y1:rowBand(f.row)+rowBand.bandwidth()/2,
+        x2:zx(t.start), y2:rowBand(t.row)+rowBand.bandwidth()/2
+      };
+    }).filter(Boolean);
+    const sel=connG.selectAll("line").data(data);
+    sel.enter().append("line").attr("stroke","#ffffff55").attr("stroke-width",2)
+      .merge(sel)
+      .attr("x1",d=>d.x1).attr("x2",d=>d.x2)
+      .attr("y1",d=>d.y1).attr("y2",d=>d.y2);
+    sel.exit().remove();
+  }
+  renderConnectors(x);
+
+  // ========= ANCHORS (raised labels) ========================================
+  const Amap=Object.fromEntries(anchors.map(a=>[a.id,a]));
+  const anchorG=g.append("g");
+  const anchorNodes=anchorG.selectAll("g").data(anchors).join("g")
+    .attr("transform",d=>`translate(${x(d.pos)},${baselineY})`);
+
+  anchorNodes.append("line").attr("class","anchor-stem").attr("y1",0).attr("y2",-10);
+  anchorNodes.append("circle").attr("r",4.5).attr("fill","#1f77b4").attr("stroke","#0b3a6f").attr("stroke-width",1.25);
+  anchorNodes.append("text").attr("class","anchor-label").attr("text-anchor","middle").attr("y",-14).text(d=>d.id);
+
+  function layoutAnchorLabels(zx){
+    const MIN_DX=26,STEP=12;
+    let lastX=-Infinity,level=0;
+    anchorNodes.select("text").attr("y",(d)=>{
+      const xpx=zx(d.pos);
+      if(xpx-lastX<MIN_DX) level++; else level=0;
+      lastX=xpx;
+      return -14-level*STEP;
+    });
+    anchorNodes.select("line.anchor-stem")
+      .attr("y2",function(){
+        const ty=+d3.select(this.parentNode).select("text").attr("y");
+        return ty+4;
+      });
+  }
+  layoutAnchorLabels(x);
 
   // ========= ARCS (below axis) =============================================
-  const maxPercent = d3.max(links, d => d.percent) || 1;
-  const widthScale = d3.scaleSqrt().domain([0, maxPercent]).range([1.2, 14]);
-  links = links.map(l => ({...l, label: `${l.from}➞${l.to} ${d3.format(".1f")(l.percent)}%`, strokeWidth: widthScale(l.percent)}));
+  const maxPercent=d3.max(links,d=>d.percent)||1;
+  const widthScale=d3.scaleSqrt().domain([0,maxPercent]).range([1.2,14]);
+  links=links.map(l=>({...l,label:`${l.from}➞${l.to} ${d3.format(".1f")(l.percent)}%`,strokeWidth:widthScale(l.percent)}));
 
-  function arcPathDown(x0, x1, k=.33){
-    const mid = (x0 + x1)/2;
-    const span = Math.abs(x1 - x0);
-    const h = Math.max(40, span * k);
-    return `M${x0},${baselineY} Q${mid},${baselineY + h} ${x1},${baselineY}`;
+  function arcPathDown(x0,x1,k=.33){
+    const mid=(x0+x1)/2,span=Math.abs(x1-x0);
+    const h=Math.max(40,span*k);
+    return `M${x0},${baselineY} Q${mid},${baselineY+h} ${x1},${baselineY}`;
   }
 
-  const linksG = g.append("g").attr("class","links");
-  const labelG = g.append("g").attr("class","labels");
-  const defs = svg.append("defs");
+  const linksG=g.append("g").attr("class","links");
+  const labelG=g.append("g").attr("class","labels");
+  const defs=svg.append("defs");
 
   function renderLinks(zx){
-    const pathSel = linksG.selectAll("path.link").data(links, d => d.id || `${d.from}-${d.to}`);
-    pathSel.enter()
-      .append("path")
-      .attr("class","link")
-      .attr("stroke", d => colorForDonor(d.from))
+    const pathSel=linksG.selectAll("path.link").data(links,d=>d.id||`${d.from}-${d.to}`);
+    pathSel.enter().append("path").attr("class","link")
+      .attr("stroke",d=>colorForDonor(d.from))
       .merge(pathSel)
-      .attr("stroke-width", d => d.strokeWidth)
-      .attr("d", d => {
-        const x0 = zx(Amap[d.from].pos), x1 = zx(Amap[d.to].pos);
+      .attr("stroke-width",d=>d.strokeWidth)
+      .attr("d",d=>{
+        const x0=zx(Amap[d.from].pos),x1=zx(Amap[d.to].pos);
         return arcPathDown(x0,x1,.33);
       });
     pathSel.exit().remove();
 
-    links.forEach((d,i) => {
-      const pid = `arc-label-path-${i}`;
-      let p = defs.select(`#${pid}`);
-      if (p.empty()) p = defs.append("path").attr("id", pid);
-      const x0 = zx(Amap[d.from].pos), x1 = zx(Amap[d.to].pos);
-      p.attr("d", arcPathDown(x0,x1,.33));
+    links.forEach((d,i)=>{
+      const pid=`arc-label-path-${i}`;
+      let p=defs.select(`#${pid}`);
+      if(p.empty()) p=defs.append("path").attr("id",pid);
+      const x0=zx(Amap[d.from].pos),x1=zx(Amap[d.to].pos);
+      p.attr("d",arcPathDown(x0,x1,.33));
     });
 
-    const lblSel = labelG.selectAll("text.arc-label").data(links, d => d.id || `${d.from}-${d.to}`);
-    const lblEnter = lblSel.enter().append("text").attr("class","arc-label").attr("dy", 14);
+    const lblSel=labelG.selectAll("text.arc-label").data(links,d=>d.id||`${d.from}-${d.to}`);
+    const lblEnter=lblSel.enter().append("text").attr("class","arc-label").attr("dy",14);
     lblEnter.append("textPath")
-      .attr("href", (_,i)=>`#arc-label-path-${i}`)
+      .attr("href",(_,i)=>`#arc-label-path-${i}`)
       .attr("startOffset","50%")
       .attr("text-anchor","middle");
-    lblEnter.merge(lblSel).select("textPath").text(d => d.label);
+    lblEnter.merge(lblSel).select("textPath").text(d=>d.label);
     lblSel.exit().remove();
   }
-  function colorForDonor(donor){
-    if (donor.startsWith("D1")) return "#4a90e2";
-    if (donor.startsWith("D2")) return "#f5a623";
-    if (donor.startsWith("D3")) return "#999999";
-    return "#8aa7ff";
+
+  function colorForDonor(d){
+    if(d.startsWith("D1"))return"#4a90e2";
+    if(d.startsWith("D2"))return"#f5a623";
+    if(d.startsWith("D3"))return"#999999";
+    return"#8aa7ff";
   }
   renderLinks(x);
 
-  // ========= ZOOM (x-only, WITH CONSTRAIN) ==================================
+  // ========= ZOOM ===========================================================
   function onZoom(ev){
-    const t = ev.transform;
-    const zx = t.rescaleX(x);
+    const t=ev.transform,zx=t.rescaleX(x);
     drawAxis(zx);
     renderFeatures(zx);
-    anchorNodes.attr("transform", d => `translate(${zx(d.pos)},${baselineY})`);
+    renderConnectors(zx);
+    anchorNodes.attr("transform",d=>`translate(${zx(d.pos)},${baselineY})`);
+    layoutAnchorLabels(zx);
     renderLinks(zx);
   }
 
-  const zoom = d3.zoom()
-    .scaleExtent([1, 20])
-    .translateExtent([[0,0],[innerW, innerH]]) // ok to keep
-    .constrain(t => {
-      const k = t.k;
-      // Clamp x so that 0 stays >= left edge and GENOME_MAX <= right edge
-      const minX = innerW * (1 - k); // when fully panned right
-      const maxX = 0;                // when fully panned left
-      const clampedX = Math.max(minX, Math.min(maxX, t.x));
-      return d3.zoomIdentity.translate(clampedX, 0).scale(k);
+  const zoom=d3.zoom().scaleExtent([1,20])
+    .translateExtent([[0,0],[innerW,innerH]])
+    .constrain(t=>{
+      const k=t.k,minX=innerW*(1-k),maxX=0;
+      const clampedX=Math.max(minX,Math.min(maxX,t.x));
+      return d3.zoomIdentity.translate(clampedX,0).scale(k);
     })
-    .on("zoom", onZoom);
+    .on("zoom",onZoom);
 
-  // prevent page scroll while wheel-zooming
-  svg.node().addEventListener('wheel', e => e.preventDefault(), { passive:false });
+  svg.node().addEventListener("wheel",e=>e.preventDefault(),{passive:false});
   svg.call(zoom);
 })();
 </script>
