@@ -36,6 +36,12 @@ params:
   splice_isoform_csv: "spliceforms_short.csv"
 ---
 
+```{css}
+table tr:nth-child(even) {
+  background-color: #2b3b4b;
+}
+```
+
 ```{r setup, include=FALSE}
 # allows the interactive shell has the same behavior as rendering
 if (interactive()) {
