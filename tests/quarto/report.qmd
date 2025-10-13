@@ -835,7 +835,7 @@ window.addEventListener('DOMContentLoaded', () => {
     .range([0, r1, r2, r3]);
 
   // Axis in increments of 100
-  const tickVals = d3.range(0, genomeMax + 1, 1000);
+  const tickVals = d3.range(0, genomeMax + 1, 250);
   const xAxis = d3.axisBottom(x)
     .tickValues(tickVals)
     .tickFormat(d3.format("~d"))
