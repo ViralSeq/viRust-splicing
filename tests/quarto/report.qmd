@@ -783,6 +783,8 @@ cat(sprintf('<script>window.links = %s;</script>', link))
     4: "LTRs"
   };
 
+  // test comment
+
   const C = {
     gag:"#6aa0e6", pol:"#d63b3b", env:"#f4be12",
     sub:"#6aa0e6", access:"#94c973", ltr:"#aaaaaa"
