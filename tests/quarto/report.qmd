@@ -849,24 +849,15 @@ cat(sprintf('<script>window.links = %s;</script>', link))
     .range([0, innerW])
     .clamp(true);
 
-  // ----- derive rows dynamically -----
-  const rows = Array.from(new Set(features.map(d => +d.row))).sort((a,b)=>a-b);
-  const trackHeightPortion = 0.45; // top portion for rows
-  const rowBand = d3.scaleBand()
-    .domain(rows)
-    .range([0, innerH * trackHeightPortion])
-    .paddingInner(0.28)
-    .paddingOuter(0.1);
+  // Axis in increments of 100
+  const tickVals = d3.range(0, genomeMax + 1, 250);
+  const xAxis = d3.axisBottom(x)
+    .tickValues(tickVals)
+    .tickFormat(d3.format("~d"))
+    .tickSizeOuter(0);
 
-  const baselineY = Math.round(innerH * 0.62);
-  const arcAreaBottom = innerH;
-
-  // Axis & grid
-  let tickStep = 250;
-  let tickVals = d3.range(0, GENOME_MAX + 1, tickStep);
-  if (!tickVals.includes(GENOME_MAX)) tickVals.push(GENOME_MAX); // ensure end tick
-
-  const axisG = g.append("g").attr("transform", `translate(0,${baselineY})`);
+  // --- Axis & grid ---
+  const axisG = g.append("g").attr("transform",`translate(0,${baselineY})`);
   axisG.append("line")
     .attr("x1",0).attr("x2",innerW).attr("y1",0).attr("y2",0)
     .attr("stroke","#cdd3e1").attr("stroke-width",1.25);
