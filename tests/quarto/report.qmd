@@ -761,16 +761,40 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   #splice_map .feat text{font-size:18; fill:#0b1220; font-weight:600; paint-order:stroke; stroke:#ffffff; stroke-width:3px}
   #splice_map .link{fill:none;stroke-opacity:.35;pointer-events:stroke}
   #splice_map .link:hover{stroke-opacity:.9}
-  #splice_map .arc-label{font:16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; fill:#0b1220; paint-order:stroke; stroke:#ffffff; stroke-width:3px; pointer-events:none;}
+
+  /* Hide arc labels until hover; we'll toggle via JS .style('opacity', ...) */
+  #splice_map .arc-label{
+    font:16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    fill:#0b1220; paint-order:stroke; stroke:#ffffff; stroke-width:3px;
+    pointer-events:none; opacity:0; transition:opacity .12s ease-in-out;
+  }
+
   #splice_map .board, #splice_map svg { overscroll-behavior: contain; }
 
-  /* NEW: anchor labels above axis */
+  /* Anchor labels above axis */
   #splice_map .anchor-label{fill:#dbe3f5;font-size:14px;text-shadow:0 1px 0 #0b1220}
   #splice_map .anchor-stem{stroke:#cdd3e1;stroke-width:1;opacity:.65}
+
+  /* Connector arcs between features */
+  #splice_map .connector{fill:none; stroke:#ffffff88; stroke-width:2}
+
+  /* Hint badge (top-right) */
+  #splice_map .hint{
+    position:absolute; top:8px; right:10px;
+    background:rgba(15,23,42,.6); color:#e5efff;
+    border:1px solid rgba(255,255,255,.18); border-radius:10px;
+    padding:6px 10px; font:12px/1.1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    display:flex; gap:8px; align-items:center; user-select:none; pointer-events:none;
+  }
+  #splice_map .hint .icon{font-size:14px}
 </style>
 
 <div id="splice_map" class="wrap">
   <div class="board">
+    <div class="hint" aria-hidden="true">
+      <span class="icon">🖱️</span>
+      <span>Scroll to zoom • Drag to pan ↔️</span>
+    </div>
     <svg id="stage"></svg>
   </div>
 </div>
@@ -820,6 +844,7 @@ cat(sprintf('<script>window.links = %s;</script>', link))
     {id:"L5",from:"D3",to:"A5",percent:1.7},
     {id:"L6",from:"D3",to:"A7",percent:2.1}
   ];
+  links = links.map((l,i)=>({...l, uid: l.id || `L_${l.from}_${l.to}_${i}`}));
 
   // ========= SCAFFOLD =======================================================
   const W=1200,H=680,M={t:30,r:24,b:80,l:80};
@@ -830,17 +855,14 @@ cat(sprintf('<script>window.links = %s;</script>', link))
 
   const x=d3.scaleLinear().domain([0,GENOME_MAX]).range([0,innerW]).clamp(true);
 
-  // tighter spacing between rows ↓↓↓
+  // tighter spacing between rows
   const rows=[...new Set(features.map(d=>+d.row))].sort((a,b)=>a-b);
   const rowBand=d3.scaleBand().domain(rows).range([0,innerH*0.55]).paddingInner(0.15).paddingOuter(0.05);
 
   const baselineY=Math.round(innerH*0.62);
-  const arcAreaBottom=innerH;
 
   // Axis
-  const tickStep=1000;
-  const tickVals=d3.range(0,GENOME_MAX+1,tickStep);
-  const grid=g.append("g");
+  const tickVals=d3.range(0,GENOME_MAX+1,1000);
   const xAxisG=g.append("g").attr("class","axis").attr("transform",`translate(0,${baselineY})`);
   function drawAxis(zx){
     xAxisG.call(d3.axisBottom(zx).tickValues(tickVals).tickFormat(d3.format("~d")).tickSizeOuter(0));
@@ -881,28 +903,35 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   }
   renderFeatures(x);
 
-  // ========= FEATURE CONNECTIONS ============================================
-  // Connect tat-1→tat-2 and rev-1→rev-2 with simple lines
-  const connectors=[
-    {from:"tat-1",to:"tat-2"},
-    {from:"rev-1",to:"rev-2"}
-  ];
+  // ========= FEATURE CONNECTOR ARCS ========================================
+  const connectors=[ {from:"tat-1",to:"tat-2"}, {from:"rev-1",to:"rev-2"} ];
   const connG=g.append("g").attr("class","connectors");
+
+  function bridgePath(x1,y1,x2,y2,k=0.22){
+    const midx=(x1+x2)/2;
+    const span=Math.hypot(x2-x1,y2-y1);
+    const lift = Math.max(16, span*k) * -0.35; // arc upward
+    const cy = (y1+y2)/2 + lift;
+    return `M${x1},${y1} Q${midx},${cy} ${x2},${y2}`;
+  }
+
   function renderConnectors(zx){
     const data=connectors.map(c=>{
       const f=features.find(d=>d.name===c.from);
       const t=features.find(d=>d.name===c.to);
       if(!f||!t) return null;
       return {
-        x1:zx(f.end), y1:rowBand(f.row)+rowBand.bandwidth()/2,
-        x2:zx(t.start), y2:rowBand(t.row)+rowBand.bandwidth()/2
+        path: bridgePath(
+          zx(f.end), rowBand(f.row)+rowBand.bandwidth()/2,
+          zx(t.start), rowBand(t.row)+rowBand.bandwidth()/2
+        )
       };
     }).filter(Boolean);
-    const sel=connG.selectAll("line").data(data);
-    sel.enter().append("line").attr("stroke","#ffffff55").attr("stroke-width",2)
+
+    const sel=connG.selectAll("path.connector").data(data);
+    sel.enter().append("path").attr("class","connector")
       .merge(sel)
-      .attr("x1",d=>d.x1).attr("x2",d=>d.x2)
-      .attr("y1",d=>d.y1).attr("y2",d=>d.y2);
+      .attr("d",d=>d.path);
     sel.exit().remove();
   }
   renderConnectors(x);
@@ -934,7 +963,7 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   }
   layoutAnchorLabels(x);
 
-  // ========= ARCS (below axis) =============================================
+  // ========= FLOW ARCS + HOVER LABELS ======================================
   const maxPercent=d3.max(links,d=>d.percent)||1;
   const widthScale=d3.scaleSqrt().domain([0,maxPercent]).range([1.2,14]);
   links=links.map(l=>({...l,label:`${l.from}➞${l.to} ${d3.format(".1f")(l.percent)}%`,strokeWidth:widthScale(l.percent)}));
@@ -950,10 +979,21 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   const defs=svg.append("defs");
 
   function renderLinks(zx){
-    const pathSel=linksG.selectAll("path.link").data(links,d=>d.id||`${d.from}-${d.to}`);
-    pathSel.enter().append("path").attr("class","link")
+    // paths
+    const pathSel=linksG.selectAll("path.link").data(links,d=>d.uid);
+    const pathEnter=pathSel.enter().append("path").attr("class","link")
       .attr("stroke",d=>colorForDonor(d.from))
-      .merge(pathSel)
+      .attr("data-uid",d=>d.uid)
+      .on("mouseenter", function(event,d){
+        d3.select(this).style("stroke-opacity", 0.9);
+        labelG.select(`#lbl-${d.uid}`).style("opacity", 1);   // <-- style(), not attr()
+      })
+      .on("mouseleave", function(event,d){
+        d3.select(this).style("stroke-opacity", 0.35);
+        labelG.select(`#lbl-${d.uid}`).style("opacity", 0);   // <-- style(), not attr()
+      });
+
+    pathEnter.merge(pathSel)
       .attr("stroke-width",d=>d.strokeWidth)
       .attr("d",d=>{
         const x0=zx(Amap[d.from].pos),x1=zx(Amap[d.to].pos);
@@ -961,20 +1001,28 @@ cat(sprintf('<script>window.links = %s;</script>', link))
       });
     pathSel.exit().remove();
 
-    links.forEach((d,i)=>{
-      const pid=`arc-label-path-${i}`;
+    // define label paths
+    links.forEach((d)=>{
+      const pid=`arc-label-path-${d.uid}`;
       let p=defs.select(`#${pid}`);
       if(p.empty()) p=defs.append("path").attr("id",pid);
       const x0=zx(Amap[d.from].pos),x1=zx(Amap[d.to].pos);
       p.attr("d",arcPathDown(x0,x1,.33));
     });
 
-    const lblSel=labelG.selectAll("text.arc-label").data(links,d=>d.id||`${d.from}-${d.to}`);
-    const lblEnter=lblSel.enter().append("text").attr("class","arc-label").attr("dy",14);
+    // labels (hidden by default; shown on hover via .style)
+    const lblSel=labelG.selectAll("text.arc-label").data(links,d=>d.uid);
+    const lblEnter=lblSel.enter().append("text")
+      .attr("class","arc-label")
+      .attr("dy",14)
+      .attr("id",d=>`lbl-${d.uid}`)   // targeted on hover
+      .style("opacity", 0);           // explicit initial style to be safe
+
     lblEnter.append("textPath")
-      .attr("href",(_,i)=>`#arc-label-path-${i}`)
+      .attr("href",d=>`#arc-label-path-${d.uid}`)
       .attr("startOffset","50%")
       .attr("text-anchor","middle");
+
     lblEnter.merge(lblSel).select("textPath").text(d=>d.label);
     lblSel.exit().remove();
   }
@@ -1007,6 +1055,7 @@ cat(sprintf('<script>window.links = %s;</script>', link))
     })
     .on("zoom",onZoom);
 
+  // prevent page scroll while wheel-zooming
   svg.node().addEventListener("wheel",e=>e.preventDefault(),{passive:false});
   svg.call(zoom);
 })();
