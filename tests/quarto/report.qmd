@@ -343,11 +343,11 @@ create_embedded_csv_link <- function(df) {
 data  %>%
   mutate(spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown")))%>%
   tableby(~ spliced, data = .) -> splice_summary
-  
+
 splice_summary %>% summary()
 
 data  %>%
-  mutate(spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown"))) %>% 
+  mutate(spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown"))) %>%
   count(spliced, sort = T) -> splice_summary
 
 download_link <- create_embedded_csv_link(splice_summary)
@@ -409,14 +409,14 @@ Unknown splice types can come from mismatches (sequencing errors), unrecognized 
 
 
 
-## Size class analysis 
+## Size class analysis
 
 ```{r, results = 'asis'}
 data %>% filter(spliced == "spliced") %>% tableby(~size_class.x, data = .) %>% summary()
 
-size_class_summary <- data %>% 
-  filter(spliced == "spliced") %>% 
-  mutate(`Size class` = size_class.x) %>% 
+size_class_summary <- data %>%
+  filter(spliced == "spliced") %>%
+  mutate(`Size class` = size_class.x) %>%
   count(`Size class`, sort = TRUE)
 
 download_link <- create_embedded_csv_link(size_class_summary)
@@ -425,7 +425,7 @@ download_link <- create_embedded_csv_link(size_class_summary)
 [⬇️ Download this sumamry CSV for Size class](`r download_link`){download="size_class_summary.csv"}
 
 
-::: {.callout-caution} 
+::: {.callout-caution}
 
 - ***"Both"*** indicates that the splice isoform can be either 1.8kb or 4kb class. Post splicing sequences end before D4 (HXB2 6045). Splicing size class cannot be determined. Often see in RANDOM-REVERSE assay.
 
@@ -439,53 +439,64 @@ download_link <- create_embedded_csv_link(size_class_summary)
 
 ## Splicing Event Map
 
-Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequences by UMI family**.  
+Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequences by UMI family**.
 
 ```{=html}
 <style>
   #splice_map{width:100%;margin:18px auto;padding:0 16px;}
-  #splice_map .board{position:relative;background: #2b3b4b;border:1px solid #23314a;border-radius:14px;overflow:hidden}
+  #splice_map .board{position:relative;background:#2b3b4b;border:1px solid #23314a;border-radius:14px;overflow:hidden}
   #splice_map svg{width:100%;height:680px;display:block}
-  #splice_map .axis line,.axis path{stroke: #cdd3e1}
-  #splice_map .tick text{fill: #cdd3e1;font-size:12px}
-  #splice_map .row-label{fill: #cdd3e1;font-size:18px;dominant-baseline:middle}
-  #splice_map .feat rect{rx:6; ry:6; stroke: #444d65ff; stroke-width:1}
-  #splice_map .feat text{font-size:18; fill: #0b1220; font-weight:600; paint-order:stroke; stroke:#ffffff; stroke-width:3px}
+  #splice_map .axis line,.axis path{stroke:#cdd3e1}
+  #splice_map .tick text{fill:#cdd3e1;font-size:12px}
+  #splice_map .row-label{fill:#cdd3e1;font-size:18px;dominant-baseline:middle}
+  #splice_map .feat rect{rx:6; ry:6; stroke:#444d65ff; stroke-width:1}
+  #splice_map .feat text{font-size:18; fill:#0b1220; font-weight:600; paint-order:stroke; stroke:#ffffff; stroke-width:3px}
   #splice_map .link{fill:none;stroke-opacity:.35;pointer-events:stroke}
   #splice_map .link:hover{stroke-opacity:.9}
 
-  /* Hide arc labels until hover; we'll toggle via JS .style('opacity', ...) */
+  /* Hide arc labels until hover */
   #splice_map .arc-label{
     font:16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-    fill: #0b1220; paint-order:stroke; stroke: #ffffff; stroke-width:3px;
+    fill:#0b1220; paint-order:stroke; stroke:#ffffff; stroke-width:3px;
     pointer-events:none; opacity:0; transition:opacity .12s ease-in-out;
   }
 
-  #splice_map .board, #splice_map svg { overscroll-behavior: contain; }
+  #splice_map .board, #splice_map svg{overscroll-behavior:contain;}
 
-  /* Anchor labels above axis */
+  /* Anchors */
   #splice_map .anchor-label{fill:#dbe3f5;font-size:14px;text-shadow:0 1px 0 #0b1220}
   #splice_map .anchor-stem{stroke:#cdd3e1;stroke-width:1;opacity:.65}
 
-  /* Connector arcs between features */
-  #splice_map .connector{fill:none; stroke:#ffffff88; stroke-width:2}
+  /* Connectors */
+  #splice_map .connector{fill:none;stroke:#ffffff88;stroke-width:2}
 
-  /* Hint badge (top-right) */
+  /* Hint panel with Reset button inside */
   #splice_map .hint{
     position:absolute; top:8px; right:10px;
     background:rgba(15,23,42,.6); color:#e5efff;
     border:1px solid rgba(255,255,255,.18); border-radius:10px;
-    padding:6px 10px; font:12px/1.1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-    display:flex; gap:8px; align-items:center; user-select:none; pointer-events:none;
+    padding:8px 12px;
+    font:12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    user-select:none;
   }
   #splice_map .hint .icon{font-size:14px}
+  #splice_map .hint button{
+    background:#eaf1ff; color:#0b1220;
+    border:1px solid #2b4a7a; border-radius:6px;
+    padding:4px 10px; font-size:12px; cursor:pointer;
+  }
+  #splice_map .hint button:hover{filter:brightness(.96);}
 </style>
 
 <div id="splice_map" class="wrap">
   <div class="board">
     <div class="hint" aria-hidden="true">
-      <span class="icon">🖱️</span>
-      <span>Scroll to zoom • Drag to pan ↔️</span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="icon">🖱️</span>
+        <span>Scroll to zoom • Drag to pan ↔️</span>
+      </div>
+      <button id="resetZoomBtn" type="button">Reset Scale</button>
     </div>
     <svg id="stage"></svg>
   </div>
@@ -496,16 +507,13 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
 (function(){
   // ========= DATA ===========================================================
   const GENOME_MAX = 9719;
-
   const rowLabels = {1:"ORF1",2:"ORF2",3:"ORF3",4:"LTRs"};
-
   const C = {
     gag:"#6aa0e6", pol:"#d63b3b", env:"#f4be12",
     vif:"#94c973", ltr:"#aaaaaa",
     tat:"#448f71ff", rev:"#ec6fcfff",
     nef:"#9a0b79ff", vpu:"#c0d5f9ff", vpr:"#84a0d2ff"
   };
-
   const features = [
     {row:1,name:"Gag",start:790,end:2292,color:C.gag},
     {row:1,name:"vif",start:5041,end:5619,color:C.vif},
@@ -521,13 +529,11 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
     {row:1,name:"5'-LTR",start:1,end:634,color:C.ltr},
     {row:2,name:"3'-LTR",start:9407,end:GENOME_MAX,color:C.ltr}
   ];
-
   const anchors = [
     {id:"D1",pos:743},{id:"D2",pos:4962},{id:"D3",pos:5463},
     {id:"A1",pos:4913},{id:"A2",pos:5390},{id:"A3",pos:5777},
-    {id:"A4",pos:5955},{id:"A5",pos:5977},{id:"A7",pos:8379}, {id: "D4", pos: 6045}
+    {id:"A4",pos:5955},{id:"A5",pos:5977},{id:"A7",pos:8379},{id:"D4",pos:6045}
   ];
-
   let links = Array.isArray(window.links)?window.links:[
     {id:"L1",from:"D1",to:"A1",percent:6.2},
     {id:"L2",from:"D1",to:"A2",percent:4.8},
@@ -536,45 +542,33 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
     {id:"L5",from:"D3",to:"A5",percent:1.7},
     {id:"L6",from:"D3",to:"A7",percent:2.1}
   ];
-  links = links.map((l,i)=>({...l, uid: l.id || `L_${l.from}_${l.to}_${i}`}));
+  links = links.map((l,i)=>({...l, uid:l.id||`L_${l.from}_${l.to}_${i}`}));
 
   // ========= SCAFFOLD =======================================================
   const W=1200,H=680,M={t:30,r:24,b:80,l:80};
   const innerW=W-M.l-M.r,innerH=H-M.t-M.b;
-
   const svg=d3.select("#stage").attr("viewBox",`0 0 ${W} ${H}`).attr("preserveAspectRatio","xMidYMid meet");
   const g=svg.append("g").attr("transform",`translate(${M.l},${M.t})`);
-
   const x=d3.scaleLinear().domain([0,GENOME_MAX]).range([0,innerW]).clamp(true);
-
-  // tighter spacing between rows
   const rows=[...new Set(features.map(d=>+d.row))].sort((a,b)=>a-b);
   const rowBand=d3.scaleBand().domain(rows).range([0,innerH*0.55]).paddingInner(0.15).paddingOuter(0.05);
-
   const baselineY=Math.round(innerH*0.62);
-
-  // Axis
   const tickVals=d3.range(0,GENOME_MAX+1,1000);
   const xAxisG=g.append("g").attr("class","axis").attr("transform",`translate(0,${baselineY})`);
-  function drawAxis(zx){
-    xAxisG.call(d3.axisBottom(zx).tickValues(tickVals).tickFormat(d3.format("~d")).tickSizeOuter(0));
-  }
+  function drawAxis(zx){xAxisG.call(d3.axisBottom(zx).tickValues(tickVals).tickFormat(d3.format("~d")).tickSizeOuter(0));}
   drawAxis(x);
 
   // ========= FEATURES =======================================================
   const featuresG=g.append("g");
-
   function renderFeatures(zx){
     const byRow=d3.group(features,d=>+d.row);
     const rowGroups=featuresG.selectAll("g.row").data(rows,d=>d)
       .join(enter=>enter.append("g").attr("class","row").attr("data-row",d=>d)
         .attr("transform",d=>`translate(0,${rowBand(d)})`));
-
     rowGroups.each(function(rowNum){
       const group=d3.select(this);
       const feats=byRow.get(rowNum)||[];
       const rowH=rowBand.bandwidth();
-
       const sel=group.selectAll("g.feat").data(feats,d=>d.name);
       const enter=sel.enter().append("g").attr("class","feat");
       enter.append("rect"); enter.append("text").attr("dominant-baseline","middle");
@@ -595,130 +589,79 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
   }
   renderFeatures(x);
 
-  // ========= FEATURE CONNECTOR ARCS ========================================
-  const connectors=[ {from:"tat-1",to:"tat-2"}, {from:"rev-1",to:"rev-2"} ];
+  // ========= CONNECTORS =====================================================
+  const connectors=[{from:"tat-1",to:"tat-2"},{from:"rev-1",to:"rev-2"}];
   const connG=g.append("g").attr("class","connectors");
-
   function bridgePath(x1,y1,x2,y2,k=0.22){
-    const midx=(x1+x2)/2;
-    const span=Math.hypot(x2-x1,y2-y1);
-    const lift = Math.max(16, span*k) * -0.35; // arc upward
-    const cy = (y1+y2)/2 + lift;
+    const midx=(x1+x2)/2,span=Math.hypot(x2-x1,y2-y1);
+    const lift=Math.max(16,span*k)*-0.35,cy=(y1+y2)/2+lift;
     return `M${x1},${y1} Q${midx},${cy} ${x2},${y2}`;
   }
-
   function renderConnectors(zx){
     const data=connectors.map(c=>{
-      const f=features.find(d=>d.name===c.from);
-      const t=features.find(d=>d.name===c.to);
-      if(!f||!t) return null;
-      return {
-        path: bridgePath(
-          zx(f.end), rowBand(f.row)+rowBand.bandwidth()/2,
-          zx(t.start), rowBand(t.row)+rowBand.bandwidth()/2
-        )
-      };
+      const f=features.find(d=>d.name===c.from),t=features.find(d=>d.name===c.to);
+      if(!f||!t)return null;
+      return{path:bridgePath(zx(f.end),rowBand(f.row)+rowBand.bandwidth()/2,zx(t.start),rowBand(t.row)+rowBand.bandwidth()/2)};
     }).filter(Boolean);
-
     const sel=connG.selectAll("path.connector").data(data);
-    sel.enter().append("path").attr("class","connector")
-      .merge(sel)
-      .attr("d",d=>d.path);
+    sel.enter().append("path").attr("class","connector").merge(sel).attr("d",d=>d.path);
     sel.exit().remove();
   }
   renderConnectors(x);
 
-  // ========= ANCHORS (raised labels) ========================================
+  // ========= ANCHORS ========================================================
   const Amap=Object.fromEntries(anchors.map(a=>[a.id,a]));
   const anchorG=g.append("g");
   const anchorNodes=anchorG.selectAll("g").data(anchors).join("g")
     .attr("transform",d=>`translate(${x(d.pos)},${baselineY})`);
-
   anchorNodes.append("line").attr("class","anchor-stem").attr("y1",0).attr("y2",-10);
   anchorNodes.append("circle").attr("r",4.5).attr("fill","#1f77b4").attr("stroke","#0b3a6f").attr("stroke-width",1.25);
   anchorNodes.append("text").attr("class","anchor-label").attr("text-anchor","middle").attr("y",-14).text(d=>d.id);
-
   function layoutAnchorLabels(zx){
-    const MIN_DX=26,STEP=12;
-    let lastX=-Infinity,level=0;
-    anchorNodes.select("text").attr("y",(d)=>{
-      const xpx=zx(d.pos);
-      if(xpx-lastX<MIN_DX) level++; else level=0;
-      lastX=xpx;
-      return -14-level*STEP;
+    const MIN_DX=26,STEP=12;let lastX=-Infinity,level=0;
+    anchorNodes.select("text").attr("y",d=>{
+      const xpx=zx(d.pos);if(xpx-lastX<MIN_DX)level++;else level=0;lastX=xpx;return-14-level*STEP;
     });
-    anchorNodes.select("line.anchor-stem")
-      .attr("y2",function(){
-        const ty=+d3.select(this.parentNode).select("text").attr("y");
-        return ty+4;
-      });
+    anchorNodes.select("line.anchor-stem").attr("y2",function(){
+      const ty=+d3.select(this.parentNode).select("text").attr("y");return ty+4;
+    });
   }
   layoutAnchorLabels(x);
 
-  // ========= FLOW ARCS + HOVER LABELS ======================================
+  // ========= LINKS ==========================================================
   const maxPercent=d3.max(links,d=>d.percent)||1;
   const widthScale=d3.scaleSqrt().domain([0,maxPercent]).range([1.2,14]);
   links=links.map(l=>({...l,label:`${l.from}➞${l.to} ${d3.format(".1f")(l.percent)}%`,strokeWidth:widthScale(l.percent)}));
-
   function arcPathDown(x0,x1,k=.33){
-    const mid=(x0+x1)/2,span=Math.abs(x1-x0);
-    const h=Math.max(40,span*k);
-    return `M${x0},${baselineY} Q${mid},${baselineY+h} ${x1},${baselineY}`;
+    const mid=(x0+x1)/2,span=Math.abs(x1-x0),h=Math.max(40,span*k);
+    return`M${x0},${baselineY} Q${mid},${baselineY+h} ${x1},${baselineY}`;
   }
-
   const linksG=g.append("g").attr("class","links");
   const labelG=g.append("g").attr("class","labels");
   const defs=svg.append("defs");
-
   function renderLinks(zx){
-    // paths
     const pathSel=linksG.selectAll("path.link").data(links,d=>d.uid);
     const pathEnter=pathSel.enter().append("path").attr("class","link")
       .attr("stroke",d=>colorForDonor(d.from))
       .attr("data-uid",d=>d.uid)
-      .on("mouseenter", function(event,d){
-        d3.select(this).style("stroke-opacity", 0.9);
-        labelG.select(`#lbl-${d.uid}`).style("opacity", 1);   // <-- style(), not attr()
-      })
-      .on("mouseleave", function(event,d){
-        d3.select(this).style("stroke-opacity", 0.35);
-        labelG.select(`#lbl-${d.uid}`).style("opacity", 0);   // <-- style(), not attr()
-      });
-
+      .on("mouseenter",function(e,d){d3.select(this).style("stroke-opacity",0.9);labelG.select(`#lbl-${d.uid}`).style("opacity",1);})
+      .on("mouseleave",function(e,d){d3.select(this).style("stroke-opacity",0.35);labelG.select(`#lbl-${d.uid}`).style("opacity",0);});
     pathEnter.merge(pathSel)
       .attr("stroke-width",d=>d.strokeWidth)
       .attr("d",d=>{
-        const x0=zx(Amap[d.from].pos),x1=zx(Amap[d.to].pos);
-        return arcPathDown(x0,x1,.33);
+        const x0=zx(Amap[d.from].pos),x1=zx(Amap[d.to].pos);return arcPathDown(x0,x1,.33);
       });
     pathSel.exit().remove();
-
-    // define label paths
-    links.forEach((d)=>{
-      const pid=`arc-label-path-${d.uid}`;
-      let p=defs.select(`#${pid}`);
-      if(p.empty()) p=defs.append("path").attr("id",pid);
-      const x0=zx(Amap[d.from].pos),x1=zx(Amap[d.to].pos);
-      p.attr("d",arcPathDown(x0,x1,.33));
+    links.forEach(d=>{
+      const pid=`arc-label-path-${d.uid}`;let p=defs.select(`#${pid}`);if(p.empty())p=defs.append("path").attr("id",pid);
+      const x0=zx(Amap[d.from].pos),x1=zx(Amap[d.to].pos);p.attr("d",arcPathDown(x0,x1,.33));
     });
-
-    // labels (hidden by default; shown on hover via .style)
     const lblSel=labelG.selectAll("text.arc-label").data(links,d=>d.uid);
-    const lblEnter=lblSel.enter().append("text")
-      .attr("class","arc-label")
-      .attr("dy",14)
-      .attr("id",d=>`lbl-${d.uid}`)   // targeted on hover
-      .style("opacity", 0);           // explicit initial style to be safe
-
-    lblEnter.append("textPath")
-      .attr("href",d=>`#arc-label-path-${d.uid}`)
-      .attr("startOffset","50%")
-      .attr("text-anchor","middle");
-
+    const lblEnter=lblSel.enter().append("text").attr("class","arc-label").attr("dy",14).attr("id",d=>`lbl-${d.uid}`).style("opacity",0);
+    lblEnter.append("textPath").attr("href",d=>`#arc-label-path-${d.uid}`).attr("startOffset","50%").attr("text-anchor","middle");
     lblEnter.merge(lblSel).select("textPath").text(d=>d.label);
     lblSel.exit().remove();
   }
-
   function colorForDonor(d){
     if(d.startsWith("D1"))return"#4a90e2";
     if(d.startsWith("D2"))return"#f5a623";
@@ -730,26 +673,24 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
   // ========= ZOOM ===========================================================
   function onZoom(ev){
     const t=ev.transform,zx=t.rescaleX(x);
-    drawAxis(zx);
-    renderFeatures(zx);
-    renderConnectors(zx);
+    drawAxis(zx);renderFeatures(zx);renderConnectors(zx);
     anchorNodes.attr("transform",d=>`translate(${zx(d.pos)},${baselineY})`);
-    layoutAnchorLabels(zx);
-    renderLinks(zx);
+    layoutAnchorLabels(zx);renderLinks(zx);
   }
-
   const zoom=d3.zoom().scaleExtent([1,20])
     .translateExtent([[0,0],[innerW,innerH]])
     .constrain(t=>{
       const k=t.k,minX=innerW*(1-k),maxX=0;
       const clampedX=Math.max(minX,Math.min(maxX,t.x));
       return d3.zoomIdentity.translate(clampedX,0).scale(k);
-    })
-    .on("zoom",onZoom);
-
-  // prevent page scroll while wheel-zooming
+    }).on("zoom",onZoom);
   svg.node().addEventListener("wheel",e=>e.preventDefault(),{passive:false});
   svg.call(zoom);
+
+  // ========= RESET BUTTON ===================================================
+  document.getElementById("resetZoomBtn").addEventListener("click",()=>{
+    svg.transition().duration(300).call(zoom.transform,d3.zoomIdentity);
+  });
 })();
 </script>
 ```
@@ -814,14 +755,14 @@ data %>% tableby( D1_type ~ splice_cat2 , data = .) %>% summary(
   title = "Splice isoforms by major D1 types"
 )
 
-summary_splice_form1 <- data %>% 
-  filter(spliced == "spliced") %>% 
-  group_by(D1_type, splice_cat2) %>% 
+summary_splice_form1 <- data %>%
+  filter(spliced == "spliced") %>%
+  group_by(D1_type, splice_cat2) %>%
   summarize(
     n = n()
   ) %>% pivot_wider(
-    names_from = D1_type, 
-    values_from = n, 
+    names_from = D1_type,
+    values_from = n,
     values_fill = 0
   )
 
@@ -837,14 +778,14 @@ data %>% tableby( D1_type_revised ~ splice_cat2 , data = .) %>% summary(
   title = "Splice isoforms by detailed D1 types"
 )
 
-summary_splice_form2 <- data %>% 
-  filter(spliced == "spliced") %>% 
-  group_by(D1_type_revised, splice_cat2) %>% 
+summary_splice_form2 <- data %>%
+  filter(spliced == "spliced") %>%
+  group_by(D1_type_revised, splice_cat2) %>%
   summarize(
     n = n()
   ) %>% pivot_wider(
-    names_from = D1_type_revised, 
-    values_from = n, 
+    names_from = D1_type_revised,
+    values_from = n,
     values_fill = 0
   )
 
@@ -865,14 +806,14 @@ data %>% tableby( D1_type ~ main_acceptor_after_d1 , data = .) %>% summary(
   title = "Acceptor After D1 by major D1 types"
 )
 
-summary_first_acc1 <- data %>% 
-  filter(spliced == "spliced") %>% 
-  group_by(D1_type, main_acceptor_after_d1) %>% 
+summary_first_acc1 <- data %>%
+  filter(spliced == "spliced") %>%
+  group_by(D1_type, main_acceptor_after_d1) %>%
   summarize(
     n = n()
   ) %>% pivot_wider(
-    names_from = D1_type, 
-    values_from = n, 
+    names_from = D1_type,
+    values_from = n,
     values_fill = 0
   )
 
@@ -905,14 +846,14 @@ data %>% tableby( D1_type_revised ~ main_acceptor_after_d1 , data = .) %>% summa
   title = "Acceptor After D1 by detailed D1 types"
 )
 
-summary_first_acc2 <- data %>% 
-  filter(spliced == "spliced") %>% 
-  group_by(D1_type_revised, main_acceptor_after_d1) %>% 
+summary_first_acc2 <- data %>%
+  filter(spliced == "spliced") %>%
+  group_by(D1_type_revised, main_acceptor_after_d1) %>%
   summarize(
     n = n()
   ) %>% pivot_wider(
-    names_from = D1_type_revised, 
-    values_from = n, 
+    names_from = D1_type_revised,
+    values_from = n,
     values_fill = 0
   )
 
@@ -950,14 +891,14 @@ data %>% tableby( D1_type ~ final_des , data = .) %>% summary(
   title = "Final desitinations by major D1 types"
 )
 
-summary_final_des1 <- data %>% 
-  filter(spliced == "spliced") %>% 
-  group_by(D1_type, final_des) %>% 
+summary_final_des1 <- data %>%
+  filter(spliced == "spliced") %>%
+  group_by(D1_type, final_des) %>%
   summarize(
     n = n()
   ) %>% pivot_wider(
-    names_from = D1_type, 
-    values_from = n, 
+    names_from = D1_type,
+    values_from = n,
     values_fill = 0
   )
 
@@ -977,14 +918,14 @@ data %>% tableby( D1_type_revised ~ final_des , data = .) %>% summary(
   title = "Final desitinations by detailed D1 types"
 )
 
-summary_final_des2 <- data %>% 
-  filter(spliced == "spliced") %>% 
-  group_by(D1_type_revised, final_des) %>% 
+summary_final_des2 <- data %>%
+  filter(spliced == "spliced") %>%
+  group_by(D1_type_revised, final_des) %>%
   summarize(
     n = n()
   ) %>% pivot_wider(
-    names_from = D1_type_revised, 
-    values_from = n, 
+    names_from = D1_type_revised,
+    values_from = n,
     values_fill = 0
   )
 
@@ -1145,7 +1086,7 @@ It is possible the ***Incomplete*** group can also come from short reads in Rand
 
 ## Splicing Events Cascade Plots
 
-Splice events cascade per unique UMI family. 
+Splice events cascade per unique UMI family.
 
 
 ```{python}
