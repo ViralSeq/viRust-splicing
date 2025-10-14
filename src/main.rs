@@ -3,6 +3,10 @@ use std::process;
 
 use virust_splicing::config::InputConfig;
 
+/// Entry point for the viRust-Splicing application.
+/// This function handles command-line argument parsing, configuration validation,
+/// and initiates the main analysis workflow.
+/// It also manages error handling and displays relevant messages to the user.
 fn main() {
     println!(
         "{} {}",

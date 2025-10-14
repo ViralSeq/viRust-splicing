@@ -19,6 +19,19 @@ pub mod umi;
 use crate::config::{InputConfig, SpliceConfig};
 use crate::io::*;
 
+/// Main function to run the viRust-Splicing analysis workflow.
+/// It takes an InputConfig object as input and performs the following steps:
+/// 1. Validates the input FASTA files.
+/// 2. Opens the FASTA files and reads the sequences.
+/// 3. Prepares the output file path and name based on the configuration.
+/// 4. Builds the SpliceConfig from the InputConfig.
+/// 5. Processes each pair of sequences in parallel to identify splice events,
+///   filtering out sequences with homopolymers.
+/// 6. Finds UMI families from the identified splice events.
+/// 7. Writes the results to an output TSV file.
+/// 8. Checks for R installation and required packages, and summarizes the data using R.
+/// 9. Checks for Quarto and Python3 installation, and generates an HTML report using Quarto.
+/// The function returns a Result indicating success or failure of the entire workflow.
 pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     let forward_n_size = 4; // TODO consider moving to master config
     let umi_size = 14; // TODO consider moving to master config
@@ -146,7 +159,11 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-// TODO: Currently only fasta reader. Consider adding fastq reader.
+/// Opens a FASTA file and returns a FASTA reader.
+/// # Arguments
+/// * `file_path` - A string slice that holds the path to the FASTA file
+/// # Returns
+/// * `Result<fasta::Reader<BufReader<BufReader<File>>>, Box<dyn Error>>` - A result containing the FASTA reader or an error
 pub fn open_fasta_file(
     file_path: &str,
 ) -> Result<fasta::Reader<BufReader<BufReader<File>>>, Box<dyn Error>> {
