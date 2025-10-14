@@ -172,6 +172,8 @@ pub fn open_fasta_file(
     Ok(fasta::Reader::new(reader))
 }
 
+/// Checks if a sequence contains homopolymers longer than a specified threshold.
+/// # Arguments
 fn homopolymer_check(seq: &[u8]) -> bool {
     let max_homopolymer_length = 10; // TODO consider moving to master config
     let mut current_char = 0;
