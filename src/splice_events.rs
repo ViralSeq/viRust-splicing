@@ -394,17 +394,6 @@ fn slice_from_end(input: &str, chunk_size: u8, offset: u8, min_length: u8) -> Ve
     chunks
 }
 
-// // TODO: consider change the D1 here to alternative_D1, but it may not be accurate. Think more about it.
-// // The problem is that if there is a mismatch in the first acceptor site, it may pick up the second acceptor site sequence and it may look like another splice isoform.
-// // For example, if the sequence is D1-A1-D2-A2, but there is a mismatch in A1, it may pick up the sequence after D1 and it may look like D1-A2.
-// // Maybe the best way is to explicitly check if the first splice event is D1 to an acceptor site, if not, we check D1-prime.
-// fn refine_events(events: &mut Vec<String>) -> &Vec<String> {
-//     if events.len() > 2 && events[1] == "unknown" {
-//         events.remove(1);
-//     }
-//     events
-// }
-
 /// MARK: Tests
 #[cfg(test)]
 mod tests {
