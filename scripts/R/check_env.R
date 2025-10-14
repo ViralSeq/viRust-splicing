@@ -15,7 +15,8 @@ packages <- c(
   "ggrepel",
   "ggnewscale",
   "scico",
-  "jsonlite"
+  "jsonlite",
+  "base64enc"
 )
 
 # Install packages that are not already installed

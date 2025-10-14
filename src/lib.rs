@@ -16,21 +16,15 @@ pub mod runner;
 pub mod splice_events;
 pub mod umi;
 
-// pub mod splice_events;
-
 use crate::config::{InputConfig, SpliceConfig};
 use crate::io::*;
 
-// TODO: modify error handling
 pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     let forward_n_size = 4; // TODO consider moving to master config
     let umi_size = 14; // TODO consider moving to master config
 
     let r1_file_path = &config.filename_r1;
     let r2_file_path = &config.filename_r2;
-
-    // let fasta_reader_r1 = open_fasta_file(r1_file_path)?;
-    // let fasta_reader_r2 = open_fasta_file(r2_file_path)?;
 
     let sequence_files = validate_input_files(r1_file_path, r2_file_path)?;
     let records = open_sequence_files(&sequence_files)?;
@@ -78,7 +72,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let mut file = File::create(&output_tsv_file)?;
     println!(
-        "Writing output to: {}",
+        "\tWriting output to: {}",
         output_tsv_file
             .to_str()
             .unwrap_or("Error converting path to string...")
@@ -111,7 +105,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
         return Ok(());
     } else {
         println!(
-            "Data summarization completed. Summary file created at: {}",
+            "✅ Data summarization completed. \n\tSummary file created at: {}",
             output_summary_file
                 .to_str()
                 .unwrap_or("Error converting path to string...")
@@ -141,7 +135,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
         println!("Quarto report generation failed: {}", e);
     } else {
         println!(
-            "HTML report generated at: {}",
+            "\tHTML report generated at: {}",
             output_path
                 .join("report.html")
                 .to_str()

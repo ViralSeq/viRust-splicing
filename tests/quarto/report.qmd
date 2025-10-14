@@ -18,7 +18,7 @@ format:
     smooth-scroll: true
     self-contained: true
     embed-resources: true
-    fig-width: 8
+    fig-width: 12
     fig-height: 6
     page-layout: full
 execute:
@@ -61,6 +61,7 @@ library(ggrepel)
 library(ggnewscale)
 library(scico)
 library(jsonlite)
+library(base64enc)
 theme_set(theme_bw())
 ```
 
@@ -147,122 +148,10 @@ data <- data %>%
 
 data = data %>% mutate(
     splice_cat2  = splice_cat2 %>%  ff_label("Splice isoforms (Shortened)"),
-    splice_category_2 = splice_category_2 %>%  ff_label("Splice isoforms (Extended)")
+    splice_category_2 = splice_category_2 %>%  ff_label("Splice isoforms (Extended)"),
+    size_class.x = size_class.x %>% ff_label("Size class")
   )
 
-```
-
-Report generated on `r format(Sys.time(), "%Y-%m-%d %H:%M:%S")`
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-## Run settings
-
-::: {.callout-important}
-**Assay type:** `r assay_type`
-
-**Reference type:** `r strain`
-
-**Mismatch allowed:** `r mismatch`
-
-**viRust-splicing app version:** `r rustapp_version`
-:::
-
-**Input File 1 path:** `r file1`
-
-**Input File 2 path:** `r file2`
-
----
-
-::: {.callout-note}
-**Output Files:**
-
-  1. ***TSV file:*** Splice isoform analysis for each sequence, one record per sequence. NOTE: sequences with low qualities are removed.
-
-  2. ***CSF file:*** Summarized splice isoform analysis. One record per UMI family. NOTE: UMI family size less than 3 are not shown.
-
-  3. ***HTML file:*** Splice isoform analysis and visualization.
-
-:::
-
-::: {.callout-tip}
-
-This report can be generated again by running:
-
-```bash
-quarto render report.qmd --execute-params quarto_params.json
-```
-
-**DO NOT** render directly with report.qmd, params are required to properly process data.
-
-:::
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-## Overal Spliced vs. Unpliced
-
-### Summary table
-
-```{r, results = 'asis'}
-data  %>%
-  mutate(spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown")))%>%
-  tableby(~ spliced, data = .)  %>% summary()
-```
-
-
-### Percent spliced
-```{r}
-data %>%
-  count(spliced, sort = TRUE)  %>%
-  mutate(
-    percent = 100 * n/ sum(n),
-    spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown"))
-  )  %>%
-  ggplot(aes(x = 2, y = percent, fill = spliced)) +
-  geom_col(color = "white") +
-  coord_polar(theta = "y") +
-  geom_text(aes(label = round(percent, 1)),
-            position = position_stack(vjust = 0.5),
-            color = "white") +
-  scale_fill_nejm(name = "") +
-  xlim(0.5, 2.5) +
-  theme_void() +
-  labs(title = "Percent Spliced",
-       subtitle = "Including unknown") -> p1
-
-
-data %>%
-  count(spliced, sort = TRUE) %>%
-  filter(spliced != "unknown") %>%
-  mutate(
-    percent = 100 * n/ sum(n),
-    spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown"))
-  )  %>%
-  ggplot(aes(x = 2, y = percent, fill = spliced)) +
-  geom_col(color = "white") +
-  coord_polar(theta = "y") +
-  geom_text(aes(label = round(percent, 1)),
-            position = position_stack(vjust = 0.5),
-            color = "white") +
-  scale_fill_nejm() +
-  xlim(0.5, 2.5) +
-  theme_void() +
-  labs(title = "Percent Spliced",
-       subtitle = "Excluding unknown") -> p2
-
-p1 + p2 + theme(legend.position = "none")
-```
-
-
-::: {.callout-caution}
-Unknown splice types can come from mismatches (sequencing errors), unrecognized patterns or non-HIV sequences. If greater than 5%, please check the raw TSV file for details.
-:::
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-## D1 types
-
-```{r, results = 'asis'}
 # get main donor after D1
 
 data <- data %>%
@@ -319,198 +208,6 @@ data <- data %>%
     D1_type_revised = ff_label(D1_type_revised, "Detailed D1 types"),
   )
 
-
-
-# for inspections
-data %>% filter( spliced == "spliced" ) %>%
-  tableby(~ D1_type, data = .) %>% summary(title = "D1 Type of splice isoforms")
-
-data %>% filter( spliced == "spliced" ) %>%
-  tableby(~ D1_type_revised, data = .) %>% summary(title = "D1 Type of splice isoforms (detailed types)")
-```
-
-<div style="margin-top: 4em;"></div>
-
-```{r}
-data %>% filter(
-  spliced == "spliced"
-) %>%
-  count(D1_type_revised) %>%
-  mutate(percent_d1_type = 100 * n/sum(n)) %>%
-  ggplot(aes(x = D1_type_revised, y = percent_d1_type, fill = D1_type_revised)) +
-  geom_col() +
-  scale_fill_nejm(name = "D1 types") +
-    labs(y = "Percentage", x = "Type of D1", title =
-         "Types of D1 used") +
-  scale_y_continuous(limits = c(0,110)) +
-  theme(axis.text = element_blank()) +
-  geom_text(aes(label = paste0(round(percent_d1_type), "%")), size = 3, vjust = -0.5)
-
-```
-
-::: {.callout-caution}
-
-**Source of "Others" in D1 types:**
-
-* Mismatched alternative D1
-
-* Mismatched upstream acceptor sequences
-
-* Potential PCR bias (PCR primer matching acceptor sequences)
-
-* Other alternative D1 sites.
-
-**If substantial amount of "Other D1" is observed, refer to TSV file for details.**
-
-:::
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-## Splice Isoforms
-
-### Splice Isoforms by Major D1 types
-
-```{r, results = "asis"}
-data %>% tableby( D1_type ~ splice_cat2 , data = .) %>% summary(
-  title = "Splice isoforms by major D1 types"
-)
-```
-
-
-### Splice Isoforms by Detailed D1 types
-```{r, results = 'asis'}
-data %>% tableby( D1_type_revised ~ splice_cat2 , data = .) %>% summary(
-  title = "Splice isoforms by detailed D1 types"
-)
-```
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-## Acceptors After D1
-
-### By Major D1 Types
-
-```{r, results = 'asis'}
-
-data %>% tableby( D1_type ~ main_acceptor_after_d1 , data = .) %>% summary(
-  title = "Acceptor After D1 by major D1 types"
-)
-```
-
-<div style="margin-top: 4em;"></div>
-
-```{r}
-data %>%
-  filter(spliced == "spliced") %>%
-  ggplot(
-    aes(x = D1_type, fill = main_acceptor_after_d1)
-  ) +
-  geom_bar(position = "fill") +
-  scale_fill_nejm(name = "Main Acceptor\nAfter D1") +
-  labs(y = "Proportion",
-       x = "D1 types")
-
-```
-
-### By Detailed D1 Types
-
-```{r, results = 'asis'}
-
-data %>% tableby( D1_type_revised ~ main_acceptor_after_d1 , data = .) %>% summary(
-  title = "Acceptor After D1 by detailed D1 types"
-)
-```
-
-<div style="margin-top: 4em;"></div>
-
-```{r}
-data %>%
-  filter(spliced == "spliced") %>%
-  ggplot(
-    aes(x = D1_type_revised, fill = main_acceptor_after_d1)
-  ) +
-  geom_bar(position = "fill") +
-  scale_fill_nejm(name = "Main Acceptor\nAfter D1") +
-  labs(y = "Proportion", x = "D1 types") +
-  theme(axis.text.x = element_text(angle = 90))
-
-```
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-## Final Destination Summary
-
-### By Major D1 Types
-
-```{r, results = 'asis'}
-
-data %>% tableby( D1_type ~ final_des , data = .) %>% summary(
-  title = "Final desitinations by major D1 types"
-)
-```
-
-<div style="margin-top: 4em;"></div>
-
-### By Detailed D1 types
-
-```{r, results = 'asis'}
-data %>% tableby( D1_type_revised ~ final_des , data = .) %>% summary(
-  title = "Final desitinations by detailed D1 types"
-)
-```
-
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-
-## Final Destinations by splice flows
-
-::: {.callout-note}
-"Others" in D1 type are excluded in this analysis.
-:::
-
-```{r}
-summarize_splice_flow <- function(des) {
-  final_des_data <- data %>% filter(
-    spliced == "spliced",
-    final_des == des,
-    D1_type_revised != "Others"
-  )
-
-  header <- paste0("### ", des, "\n\n")
-
-  if (nrow(final_des_data) == 0) {
-    # Callout warning box
-    warning_block <- paste0(
-      "::: {.callout-warning}\n",
-      "**Warning:** Final destination ", des, " has 0 reads.\n",
-      ":::",
-      "\n\n"
-    )
-    return(paste0(header, warning_block))
-  } else {
-    res <- tableby(~ splice_cat2, data = final_des_data)
-    body <- paste(capture.output(print(summary(res), output = "markdown")), collapse = "\n")
-    body <- paste0(body, "\n\n")
-    return(paste0(header, body))
-  }
-}
-```
-
-```{r, results='asis'}
-for (des in c("A3", "A4", "A5", "A7", "vif", "vpr")) {
-  cat(summarize_splice_flow(des))
-}
-```
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-
-## Splicing Events Cascade Plots
-
-### Splicing cascade alluvial plot
-
-```{r}
 df_alluvium <- data %>% group_by(splice_cat2) %>%
   mutate(splice_category_count = n())
 
@@ -522,190 +219,9 @@ df_alluvium %>% filter(
 n <- df_alluvium_short$splice_category_count %>% sum()
 cut_off_to_show = n * 0.03
 df_alluvium_transformed <- df_alluvium_short %>% pivot_longer(cols = 1:8, names_to = "Steps")
-# df_alluvium_transformed %>% write_csv("cascade_data.csv")
-df_alluvium_transformed %>%
-  ggplot(aes(x = Steps,
-             stratum = value,
-             alluvium = splice_cat2,
-             y = splice_category_count,
-             label = value)) +
-  geom_flow(aes(fill = splice_cat2), stat="alluvium", lode.guidance="forward", alpha=0.6) +
-  new_scale_fill() +
-  geom_stratum(data = subset(df_alluvium_transformed, !is.na(value)),
-             aes(fill=value), color = "black") +
-  geom_text(stat = "stratum",
-            size = 2) +
-            #aes(label = ifelse(..count.. > cut_off_to_show, as.character(stratum), ""))) +
-  theme_bw() + theme(legend.position = "none") +
-  labs(
-    x = "",
-    y = "UMI count"
-  )
-
 
 ```
 
-
-### Splicing cascade Sankey plot
-
-```{python}
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
-
-# Load data
-# df = pd.read_csv("cascade_data.csv").dropna(subset=["value"])
-df = r.df_alluvium_transformed.dropna(subset=["value"])
-# Build node list
-nodes = list(df["value"].unique())
-node_index = {ev:i for i,ev in enumerate(nodes)}
-
-# Assign isoform colors
-isoforms = df["splice_cat2"].unique()
-palette = px.colors.qualitative.Set3
-if len(isoforms) > len(palette):
-    palette = palette * ((len(isoforms) // len(palette)) + 1)
-colors = {iso: palette[i] for i, iso in enumerate(isoforms)}
-
-# Build links with hover labels
-sources, targets, values, link_labels, link_colors = [], [], [], [], []
-for isoform, group in df.groupby("splice_cat2"):
-    group = group.sort_values("Steps")
-    events = group["value"].tolist()
-    count = group["splice_category_count"].iloc[0]
-    for i in range(len(events)-1):
-        sources.append(node_index[events[i]])
-        targets.append(node_index[events[i+1]])
-        values.append(count)
-        link_labels.append(f"Isoform: {isoform}<br>Count: {count}")
-        link_colors.append(colors[isoform])
-
-fig = go.Figure(go.Sankey(
-    arrangement="snap",
-    node=dict(label=nodes, pad=15, thickness=20),
-    link=dict(
-        source=sources,
-        target=targets,
-        value=values,
-        color=link_colors,
-        label=link_labels,
-        hovertemplate="%{label}<extra></extra>"
-    )
-))
-
-fig.update_layout(
-    title_text="HIV Splicing Isoform Sankey (hover to see isoform + count)",
-    font_size=12
-)
-```
-
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-## Splice Cascade Analysis
-
-### Events after A1
-
-Summarize the percent unspliced after A1 which is vif in the total reads that reach A1
-
-```{r, results = 'asis'}
-data %>% filter(
-  spliced == "spliced",
-  main_acceptor_after_d1 == "A1"
-) %>% mutate(
-  A1_fate = case_when(
-    splice_category_2 %>% str_detect("D2_unknown") ~ "Sequence after D2/D2b unrecognized",
-    splice_category_2 %>% str_detect("noD2b") ~ "Incomplete",
-    splice_category_2 %>% str_detect("D2b_unknown") ~ "Sequence after D2/D2b unrecognized",
-    splice_category_2 %>% str_detect("noD2") ~ "Incomplete",
-    splice_category_2 %>% str_detect("D2b-unspliced") ~ "No splicing after A1/vif",
-    TRUE ~ "Spliced at D2/D2b"
-  ),
-  A1_fate = factor(
-    A1_fate,
-    levels = c("Spliced at D2/D2b",
-               "No splicing after A1/vif",
-               "Incomplete",
-               "Sequence after D2/D2b unrecognized")),
-  A1_fate = A1_fate %>% ff_label("Splice Events After A1")
-) -> data_A1
-
-data_A1 %>% tableby(~ A1_fate, data = .) %>% summary()
-```
-
-::: {.callout-tip}
-
-The category ***"Sequence after D2/D2b unrecognized"*** comes from:
-
-1. mismatches due to sequencing error/quality drop.
-
-2. other patterns.
-
-3. short sequences.
-
-:::
-
-<div style="margin-top: 4em;"></div>
-
-### Events after A2
-
-Summarize the percent unspliced after A2 which is vif in the total reads that reach A2
-
-**Splice outcomes at A2 by Upstream Acceptor**
-
-```{r, results = 'asis'}
-reach_A2 <- c(
-  "D2_A2",
-  "D2b_A2",
-  "D1_A2"
-) %>% paste(collapse = "|")
-
-A2_incomplete <- c(
-  "noD3",
-  "D3_unknown"
-) %>% paste(collapse = "|")
-
-data %>% filter(
-  spliced == "spliced",
-  splice_category_2 %>% str_detect(reach_A2)
-) %>% mutate(
-  A2_fate = case_when(
-    splice_category_2 %>% str_detect("noD3") ~ "Incomplete",
-    splice_category_2 %>% str_detect("D3_unknown") ~ "Sequence after D3 too short/unrecognized",
-    splice_category_2 %>% str_detect("D3-unspliced") ~ "No splicing after A2/vpr",
-    TRUE ~ "Spliced at D3",
-  ),
-  A2_fate = factor(
-    A2_fate,
-    levels = c("Spliced at D3",
-               "No splicing after A2/vpr",
-               "Incomplete",
-               "Sequence after D3 too short/unrecognized")),
-  A2_fate = A2_fate %>% ff_label("Splice Events After A2")
-) -> data_A2
-
-data_A2 %>% mutate(
-  upstream_event = ifelse(main_acceptor_after_d1 == "A1", "D1->A1->A2", "D1->A2")) %>%
-  tableby(upstream_event ~ A2_fate, data = .) %>% summary()
-```
-
-::: {.callout-tip}
-
-The category ***"Sequence after D3 too short/unrecognized" ***comes from:
-
-1. mismatches due to sequencing error/quality drop.
-
-2. short sequences, often in Random-Reverse assay.
-
-It is possible the ***Incomplete*** group can also come from short reads in Random-Reverse assay.
-
-:::
-
-<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
-
-## Splice Map
-
-A splice event map showing the percent of reads with Dx->Ax event.
 
 ```{r, echo=FALSE, results='asis'}
 spliced_data = data %>% filter(spliced == "spliced") %>% count(splice_category_2)
@@ -755,23 +271,193 @@ link <- toJSON(link, dataframe = "rows", auto_unbox=TRUE)
 cat(sprintf('<script>window.links = %s;</script>', link))
 ```
 
+Report generated on `r format(Sys.time(), "%Y-%m-%d %H:%M:%S")`
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+## Run settings
+
+::: {.callout-important}
+**Assay type:** `r assay_type`
+
+**Reference type:** `r strain`
+
+**Mismatch allowed:** `r mismatch`
+
+**viRust-splicing app version:** `r rustapp_version`
+:::
+
+**Input File 1 path:** `r file1`
+
+**Input File 2 path:** `r file2`
+
+---
+
+::: {.callout-note}
+**Output Files:**
+
+  1. ***TSV file:*** Splice isoform analysis for each sequence, one record per sequence. NOTE: sequences with low qualities are removed.
+
+  2. ***CSF file:*** Summarized splice isoform analysis. One record per UMI family. NOTE: UMI family size less than 3 are not shown.
+
+  3. ***HTML file:*** Splice isoform analysis and visualization.
+
+:::
+
+::: {.callout-tip}
+
+This report can be generated again by running:
+
+```bash
+quarto render report.qmd --execute-params quarto_params.json
+```
+
+**DO NOT** render directly with report.qmd, params are required to properly process data.
+
+:::
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+## Overal Spliced vs. Unpliced
+
+### Summary table
+
+```{r}
+# helper function for download
+
+create_embedded_csv_link <- function(df) {
+  tmp <-tempfile(fileext = ".csv")
+  write_csv(df, tmp)
+  b64 <- base64encode(tmp)
+  download_link <- paste0(
+    "data:text/csv;base64,",
+    b64
+  )
+  invisible(file.remove(tmp))
+
+  return(download_link)
+}
+```
+
+```{r, results = 'asis'}
+data  %>%
+  mutate(spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown")))%>%
+  tableby(~ spliced, data = .) -> splice_summary
+  
+splice_summary %>% summary()
+
+data  %>%
+  mutate(spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown"))) %>% 
+  count(spliced, sort = T) -> splice_summary
+
+download_link <- create_embedded_csv_link(splice_summary)
+```
+
+[⬇️ Download this sumamry CSV for overall splice outcomes](`r download_link`){download="splice_summary.csv"}
+
+### Percent spliced
+```{r}
+data %>%
+  count(spliced, sort = TRUE)  %>%
+  mutate(
+    percent = 100 * n/ sum(n),
+    spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown"))
+  )  %>%
+  ggplot(aes(x = 2, y = percent, fill = spliced)) +
+  geom_col(color = "white") +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = round(percent, 1)),
+            position = position_stack(vjust = 0.5),
+            color = "white") +
+  scale_fill_nejm(name = "") +
+  xlim(0.5, 2.5) +
+  theme_void() +
+  labs(title = "Percent Spliced",
+       subtitle = "Including unknown") -> p1
+
+
+data %>%
+  count(spliced, sort = TRUE) %>%
+  filter(spliced != "unknown") %>%
+  mutate(
+    percent = 100 * n/ sum(n),
+    spliced = factor(spliced, levels = c("spliced", "unspliced", "unknown"))
+  )  %>%
+  ggplot(aes(x = 2, y = percent, fill = spliced)) +
+  geom_col(color = "white") +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = round(percent, 1)),
+            position = position_stack(vjust = 0.5),
+            color = "white") +
+  scale_fill_nejm() +
+  xlim(0.5, 2.5) +
+  theme_void() +
+  labs(title = "Percent Spliced",
+       subtitle = "Excluding unknown") -> p2
+
+p1 + p2 + theme(legend.position = "none")
+```
+
+
+::: {.callout-caution}
+Unknown splice types can come from mismatches (sequencing errors), unrecognized patterns or non-HIV sequences. If greater than 5%, please check the raw TSV file for details.
+:::
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+
+
+
+
+## Size class analysis 
+
+```{r, results = 'asis'}
+data %>% filter(spliced == "spliced") %>% tableby(~size_class.x, data = .) %>% summary()
+
+size_class_summary <- data %>% 
+  filter(spliced == "spliced") %>% 
+  mutate(`Size class` = size_class.x) %>% 
+  count(`Size class`, sort = TRUE)
+
+download_link <- create_embedded_csv_link(size_class_summary)
+```
+
+[⬇️ Download this sumamry CSV for Size class](`r download_link`){download="size_class_summary.csv"}
+
+
+::: {.callout-caution} 
+
+- ***"Both"*** indicates that the splice isoform can be either 1.8kb or 4kb class. Post splicing sequences end before D4 (HXB2 6045). Splicing size class cannot be determined. Often see in RANDOM-REVERSE assay.
+
+- ***"Unknown"*** indicates the post splicing sequence cannot be mapped to the reference genome. Size class cannot be interpreted. Mismatch and sequencing quality drop towards the end of sequences often cause this issue.
+
+:::
+
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+
+## Splicing Event Map
+
+Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequences by UMI family**.  
+
 ```{=html}
 <style>
   #splice_map{width:100%;margin:18px auto;padding:0 16px;}
-  #splice_map .board{position:relative;background:var(--panel);border:1px solid #23314a;border-radius:14px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+  #splice_map .board{position:relative;background: #2b3b4b;border:1px solid #23314a;border-radius:14px;overflow:hidden}
   #splice_map svg{width:100%;height:680px;display:block}
-  #splice_map .axis line,.axis path{stroke:#cdd3e1}
-  #splice_map .tick text{fill:#cdd3e1;font-size:12px}
-  #splice_map .row-label{fill:#cdd3e1;font-size:18px;dominant-baseline:middle}
-  #splice_map .feat rect{rx:6; ry:6; stroke:#1a2236; stroke-width:1}
-  #splice_map .feat text{font-size:18; fill:#0b1220; font-weight:600; paint-order:stroke; stroke:#ffffff; stroke-width:3px}
+  #splice_map .axis line,.axis path{stroke: #cdd3e1}
+  #splice_map .tick text{fill: #cdd3e1;font-size:12px}
+  #splice_map .row-label{fill: #cdd3e1;font-size:18px;dominant-baseline:middle}
+  #splice_map .feat rect{rx:6; ry:6; stroke: #444d65ff; stroke-width:1}
+  #splice_map .feat text{font-size:18; fill: #0b1220; font-weight:600; paint-order:stroke; stroke:#ffffff; stroke-width:3px}
   #splice_map .link{fill:none;stroke-opacity:.35;pointer-events:stroke}
   #splice_map .link:hover{stroke-opacity:.9}
 
   /* Hide arc labels until hover; we'll toggle via JS .style('opacity', ...) */
   #splice_map .arc-label{
     font:16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-    fill:#0b1220; paint-order:stroke; stroke:#ffffff; stroke-width:3px;
+    fill: #0b1220; paint-order:stroke; stroke: #ffffff; stroke-width:3px;
     pointer-events:none; opacity:0; transition:opacity .12s ease-in-out;
   }
 
@@ -839,7 +525,7 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   const anchors = [
     {id:"D1",pos:743},{id:"D2",pos:4962},{id:"D3",pos:5463},
     {id:"A1",pos:4913},{id:"A2",pos:5390},{id:"A3",pos:5777},
-    {id:"A4",pos:5955},{id:"A5",pos:5977},{id:"A7",pos:8379}
+    {id:"A4",pos:5955},{id:"A5",pos:5977},{id:"A7",pos:8379}, {id: "D4", pos: 6045}
   ];
 
   let links = Array.isArray(window.links)?window.links:[
@@ -1066,4 +752,448 @@ cat(sprintf('<script>window.links = %s;</script>', link))
   svg.call(zoom);
 })();
 </script>
+```
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+## D1 types
+
+```{r, results = 'asis'}
+
+data %>% filter( spliced == "spliced" ) %>%
+  tableby(~ D1_type, data = .) %>% summary(title = "D1 Type of splice isoforms")
+
+data %>% filter( spliced == "spliced" ) %>%
+  tableby(~ D1_type_revised, data = .) %>% summary(title = "D1 Type of splice isoforms (detailed types)")
+```
+
+
+<div style="margin-top: 4em;"></div>
+
+```{r}
+data %>% filter(
+  spliced == "spliced"
+) %>%
+  count(D1_type_revised) %>%
+  mutate(percent_d1_type = 100 * n/sum(n)) %>%
+  ggplot(aes(x = D1_type_revised, y = percent_d1_type, fill = D1_type_revised)) +
+  geom_col() +
+  scale_fill_nejm(name = "D1 types") +
+    labs(y = "Percentage", x = "Type of D1", title =
+         "Types of D1 used") +
+  scale_y_continuous(limits = c(0,110)) +
+  theme(axis.text = element_blank()) +
+  geom_text(aes(label = paste0(round(percent_d1_type), "%")), size = 3, vjust = -0.5)
+
+```
+
+::: {.callout-caution}
+
+**Source of "Others" in D1 types:**
+
+* Mismatched alternative D1
+
+* Mismatched upstream acceptor sequences
+
+* Potential PCR bias (PCR primer matching acceptor sequences)
+
+* Other alternative D1 sites.
+
+**If substantial amount of "Other D1" is observed, refer to TSV file for details.**
+
+:::
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+## Splice Isoforms
+
+### Splice Isoforms by Major D1 types
+
+```{r, results = "asis"}
+data %>% tableby( D1_type ~ splice_cat2 , data = .) %>% summary(
+  title = "Splice isoforms by major D1 types"
+)
+
+summary_splice_form1 <- data %>% 
+  filter(spliced == "spliced") %>% 
+  group_by(D1_type, splice_cat2) %>% 
+  summarize(
+    n = n()
+  ) %>% pivot_wider(
+    names_from = D1_type, 
+    values_from = n, 
+    values_fill = 0
+  )
+
+download_link <- create_embedded_csv_link(summary_splice_form1)
+```
+
+[⬇️ Download this sumamry CSV for Splice isoforms by major D1 types](`r download_link`){download="summary_splice_form1.csv"}
+
+
+### Splice Isoforms by Detailed D1 types
+```{r, results = 'asis'}
+data %>% tableby( D1_type_revised ~ splice_cat2 , data = .) %>% summary(
+  title = "Splice isoforms by detailed D1 types"
+)
+
+summary_splice_form2 <- data %>% 
+  filter(spliced == "spliced") %>% 
+  group_by(D1_type_revised, splice_cat2) %>% 
+  summarize(
+    n = n()
+  ) %>% pivot_wider(
+    names_from = D1_type_revised, 
+    values_from = n, 
+    values_fill = 0
+  )
+
+download_link <- create_embedded_csv_link(summary_splice_form2)
+```
+
+[⬇️ Download this sumamry CSV for Splice isoforms by detailed D1 types](`r download_link`){download="summary_splice_form2.csv"}
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+## Acceptors After D1
+
+### By Major D1 Types
+
+```{r, results = 'asis'}
+
+data %>% tableby( D1_type ~ main_acceptor_after_d1 , data = .) %>% summary(
+  title = "Acceptor After D1 by major D1 types"
+)
+
+summary_first_acc1 <- data %>% 
+  filter(spliced == "spliced") %>% 
+  group_by(D1_type, main_acceptor_after_d1) %>% 
+  summarize(
+    n = n()
+  ) %>% pivot_wider(
+    names_from = D1_type, 
+    values_from = n, 
+    values_fill = 0
+  )
+
+
+download_link <- create_embedded_csv_link(summary_first_acc1)
+```
+
+[⬇️ Download this sumamry CSV for First acceptor by major D1 types](`r download_link`){download="summary_first_acc1.csv"}
+
+<div style="margin-top: 4em;"></div>
+
+```{r}
+data %>%
+  filter(spliced == "spliced") %>%
+  ggplot(
+    aes(x = D1_type, fill = main_acceptor_after_d1)
+  ) +
+  geom_bar(position = "fill") +
+  scale_fill_nejm(name = "Main Acceptor\nAfter D1") +
+  labs(y = "Proportion",
+       x = "D1 types")
+
+```
+
+### By Detailed D1 Types
+
+```{r, results = 'asis'}
+
+data %>% tableby( D1_type_revised ~ main_acceptor_after_d1 , data = .) %>% summary(
+  title = "Acceptor After D1 by detailed D1 types"
+)
+
+summary_first_acc2 <- data %>% 
+  filter(spliced == "spliced") %>% 
+  group_by(D1_type_revised, main_acceptor_after_d1) %>% 
+  summarize(
+    n = n()
+  ) %>% pivot_wider(
+    names_from = D1_type_revised, 
+    values_from = n, 
+    values_fill = 0
+  )
+
+
+download_link <- create_embedded_csv_link(summary_first_acc2)
+```
+
+[⬇️ Download this sumamry CSV for First acceptor by detailed D1 types](`r download_link`){download="summary_first_des2.csv"}
+
+
+<div style="margin-top: 4em;"></div>
+
+```{r}
+data %>%
+  filter(spliced == "spliced") %>%
+  ggplot(
+    aes(x = D1_type_revised, fill = main_acceptor_after_d1)
+  ) +
+  geom_bar(position = "fill") +
+  scale_fill_nejm(name = "Main Acceptor\nAfter D1") +
+  labs(y = "Proportion", x = "D1 types") +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+## Final Destination Summary
+
+### By Major D1 Types
+
+```{r, results = 'asis'}
+
+data %>% tableby( D1_type ~ final_des , data = .) %>% summary(
+  title = "Final desitinations by major D1 types"
+)
+
+summary_final_des1 <- data %>% 
+  filter(spliced == "spliced") %>% 
+  group_by(D1_type, final_des) %>% 
+  summarize(
+    n = n()
+  ) %>% pivot_wider(
+    names_from = D1_type, 
+    values_from = n, 
+    values_fill = 0
+  )
+
+
+download_link <- create_embedded_csv_link(summary_final_des1)
+```
+
+[⬇️ Download this sumamry CSV for final destination by major D1 types](`r download_link`){download="summary_final_des1.csv"}
+
+
+<div style="margin-top: 4em;"></div>
+
+### By Detailed D1 types
+
+```{r, results = 'asis'}
+data %>% tableby( D1_type_revised ~ final_des , data = .) %>% summary(
+  title = "Final desitinations by detailed D1 types"
+)
+
+summary_final_des2 <- data %>% 
+  filter(spliced == "spliced") %>% 
+  group_by(D1_type_revised, final_des) %>% 
+  summarize(
+    n = n()
+  ) %>% pivot_wider(
+    names_from = D1_type_revised, 
+    values_from = n, 
+    values_fill = 0
+  )
+
+
+download_link <- create_embedded_csv_link(summary_final_des2)
+```
+
+[⬇️ Download this sumamry CSV for final destination by major D1 types](`r download_link`){download="summary_final_des2.csv"}
+
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+
+## Final Destinations by splice flows
+
+What happened before each final destination.
+
+::: {.callout-note}
+"Others" in D1 type are excluded in this analysis.
+:::
+
+```{r}
+summarize_splice_flow <- function(des) {
+  final_des_data <- data %>% filter(
+    spliced == "spliced",
+    final_des == des,
+    D1_type_revised != "Others"
+  )
+
+  header <- paste0("### ", des, "\n\n")
+
+  if (nrow(final_des_data) == 0) {
+    # Callout warning box
+    warning_block <- paste0(
+      "::: {.callout-warning}\n",
+      "**Warning:** Final destination ", des, " has 0 reads.\n",
+      ":::",
+      "\n\n"
+    )
+    return(paste0(header, warning_block))
+  } else {
+    res <- tableby(~ splice_cat2, data = final_des_data)
+    body <- paste(capture.output(print(summary(res), output = "markdown")), collapse = "\n")
+    body <- paste0(body, "\n\n")
+    return(paste0(header, body))
+  }
+}
+```
+
+```{r, results='asis'}
+for (des in c("A3", "A4", "A5", "A7", "vif", "vpr")) {
+  cat(summarize_splice_flow(des))
+}
+```
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+## Splice Cascade Analysis
+
+### Events after A1
+
+Summarize the percent unspliced after A1 which is vif in the total reads that reach A1
+
+```{r, results = 'asis'}
+data %>% filter(
+  spliced == "spliced",
+  main_acceptor_after_d1 == "A1"
+) %>% mutate(
+  A1_fate = case_when(
+    splice_category_2 %>% str_detect("D2_unknown") ~ "Sequence after D2/D2b unrecognized",
+    splice_category_2 %>% str_detect("noD2b") ~ "Incomplete",
+    splice_category_2 %>% str_detect("D2b_unknown") ~ "Sequence after D2/D2b unrecognized",
+    splice_category_2 %>% str_detect("noD2") ~ "Incomplete",
+    splice_category_2 %>% str_detect("D2b-unspliced") ~ "No splicing after A1/vif",
+    TRUE ~ "Spliced at D2/D2b"
+  ),
+  A1_fate = factor(
+    A1_fate,
+    levels = c("Spliced at D2/D2b",
+               "No splicing after A1/vif",
+               "Incomplete",
+               "Sequence after D2/D2b unrecognized")),
+  A1_fate = A1_fate %>% ff_label("Splice Events After A1")
+) -> data_A1
+
+data_A1 %>% tableby(~ A1_fate, data = .) %>% summary()
+```
+
+::: {.callout-tip}
+
+The category ***"Sequence after D2/D2b unrecognized"*** comes from:
+
+1. mismatches due to sequencing error/quality drop.
+
+2. other patterns.
+
+3. short sequences.
+
+:::
+
+<div style="margin-top: 4em;"></div>
+
+### Events after A2
+
+Summarize the percent unspliced after A2 which is vif in the total reads that reach A2
+
+**Splice outcomes at A2 by Upstream Acceptor**
+
+```{r, results = 'asis'}
+reach_A2 <- c(
+  "D2_A2",
+  "D2b_A2",
+  "D1_A2"
+) %>% paste(collapse = "|")
+
+A2_incomplete <- c(
+  "noD3",
+  "D3_unknown"
+) %>% paste(collapse = "|")
+
+data %>% filter(
+  spliced == "spliced",
+  splice_category_2 %>% str_detect(reach_A2)
+) %>% mutate(
+  A2_fate = case_when(
+    splice_category_2 %>% str_detect("noD3") ~ "Incomplete",
+    splice_category_2 %>% str_detect("D3_unknown") ~ "Sequence after D3 too short/unrecognized",
+    splice_category_2 %>% str_detect("D3-unspliced") ~ "No splicing after A2/vpr",
+    TRUE ~ "Spliced at D3",
+  ),
+  A2_fate = factor(
+    A2_fate,
+    levels = c("Spliced at D3",
+               "No splicing after A2/vpr",
+               "Incomplete",
+               "Sequence after D3 too short/unrecognized")),
+  A2_fate = A2_fate %>% ff_label("Splice Events After A2")
+) -> data_A2
+
+data_A2 %>% mutate(
+  upstream_event = ifelse(main_acceptor_after_d1 == "A1", "D1->A1->A2", "D1->A2")) %>%
+  tableby(upstream_event ~ A2_fate, data = .) %>% summary()
+```
+
+::: {.callout-tip}
+
+The category ***"Sequence after D3 too short/unrecognized" ***comes from:
+
+1. mismatches due to sequencing error/quality drop.
+
+2. short sequences, often in Random-Reverse assay.
+
+It is possible the ***Incomplete*** group can also come from short reads in Random-Reverse assay.
+
+:::
+
+<div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
+
+## Splicing Events Cascade Plots
+
+Splice events cascade per unique UMI family. 
+
+
+```{python}
+import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
+
+# Load data
+df = r.df_alluvium_transformed.dropna(subset=["value"])
+# Build node list
+nodes = list(df["value"].unique())
+node_index = {ev:i for i,ev in enumerate(nodes)}
+
+# Assign isoform colors
+isoforms = df["splice_cat2"].unique()
+palette = px.colors.qualitative.Set3
+if len(isoforms) > len(palette):
+    palette = palette * ((len(isoforms) // len(palette)) + 1)
+colors = {iso: palette[i] for i, iso in enumerate(isoforms)}
+
+# Build links with hover labels
+sources, targets, values, link_labels, link_colors = [], [], [], [], []
+for isoform, group in df.groupby("splice_cat2"):
+    group = group.sort_values("Steps")
+    events = group["value"].tolist()
+    count = group["splice_category_count"].iloc[0]
+    for i in range(len(events)-1):
+        sources.append(node_index[events[i]])
+        targets.append(node_index[events[i+1]])
+        values.append(count)
+        link_labels.append(f"Isoform: {isoform}<br>Count: {count}")
+        link_colors.append(colors[isoform])
+
+fig = go.Figure(go.Sankey(
+    arrangement="snap",
+    node=dict(label=nodes, pad=15, thickness=20),
+    link=dict(
+        source=sources,
+        target=targets,
+        value=values,
+        color=link_colors,
+        label=link_labels,
+        hovertemplate="%{label}<extra></extra>"
+    )
+))
+
+fig.update_layout(
+    title_text="HIV Splicing Isoform Sankey (hover to see isoform + count)",
+    font_size=12
+)
 ```

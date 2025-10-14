@@ -18,6 +18,7 @@ fn main() {
         );
         process::exit(1);
     });
+    println!("✅ Configurations validated, starting analysis...");
     #[cfg(debug_assertions)]
     dbg!(&config);
     if let Err(e) = virust_splicing::run(config) {
