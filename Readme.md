@@ -113,7 +113,7 @@ We welcome pull requests and bug reports!
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License. [MIT License](https://opensource.org/licenses/MIT).
 
 ## Achnowledgements
 
