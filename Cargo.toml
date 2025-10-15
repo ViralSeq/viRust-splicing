@@ -7,6 +7,10 @@ default-run = "virust-splicing"
 exclude = [
     "sample_data/*",
 ]
+description = "High-performance command-line program for analyzing HIV-1 splicing patterns from NGS data."
+
+license = "MIT"
+repository = "https://github.com/ViralSeq/viRust-splicing"
 
 [dependencies]
 bio = "3.0.0"
@@ -50,3 +54,6 @@ opt-level = 3
 [profile.release-with-debug]
 inherits = "release"
 debug = true
+
+
+
