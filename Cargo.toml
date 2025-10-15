@@ -33,6 +33,10 @@ harness = false
 name = "mockdata"
 path = "src/bin/mockdata/main.rs"
 
+[[bin]]
+name = "multi_report"
+path = "src/bin/multi_report/main.rs"
+
 [profile.dev]
 opt-level = 0
 
