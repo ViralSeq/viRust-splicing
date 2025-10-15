@@ -223,6 +223,23 @@ df_alluvium_transformed <- df_alluvium_short %>% pivot_longer(cols = 1:8, names_
 ```
 
 
+```{r}
+# helper function for download
+
+create_embedded_csv_link <- function(df) {
+  tmp <-tempfile(fileext = ".csv")
+  write_csv(df, tmp)
+  b64 <- base64encode(tmp)
+  download_link <- paste0(
+    "data:text/csv;base64,",
+    b64
+  )
+  invisible(file.remove(tmp))
+
+  return(download_link)
+}
+```
+
 ```{r, echo=FALSE, results='asis'}
 spliced_data = data %>% filter(spliced == "spliced") %>% count(splice_category_2)
 total_spliced = spliced_data$n %>% sum()
@@ -266,6 +283,8 @@ link <- splice_step_list %>%
          total_spliced = total_spliced,
          percent = round(100 * w/total_spliced, 1)) %>%
   select(-total, -total_spliced) %>% arrange(from, to)
+
+link_for_download <- create_embedded_csv_link(link)
 
 link <- toJSON(link, dataframe = "rows", auto_unbox=TRUE)
 cat(sprintf('<script>window.links = %s;</script>', link))
@@ -322,22 +341,6 @@ quarto render report.qmd --execute-params quarto_params.json
 
 ### Summary table
 
-```{r}
-# helper function for download
-
-create_embedded_csv_link <- function(df) {
-  tmp <-tempfile(fileext = ".csv")
-  write_csv(df, tmp)
-  b64 <- base64encode(tmp)
-  download_link <- paste0(
-    "data:text/csv;base64,",
-    b64
-  )
-  invisible(file.remove(tmp))
-
-  return(download_link)
-}
-```
 
 ```{r, results = 'asis'}
 data  %>%
@@ -696,6 +699,9 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
 </script>
 ```
 
+[⬇️ Download this data for splice links](`r link_for_download`){download="link.csv"}
+
+
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
 
 ## D1 types
@@ -794,6 +800,7 @@ download_link <- create_embedded_csv_link(summary_splice_form2)
 ```
 
 [⬇️ Download this sumamry CSV for Splice isoforms by detailed D1 types](`r download_link`){download="summary_splice_form2.csv"}
+
 
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
 
