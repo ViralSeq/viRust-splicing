@@ -4,6 +4,10 @@ version = "0.2.0"
 edition = "2024"
 default-run = "virust-splicing"
 
+exclude = [
+    "sample_data/*",
+]
+
 [dependencies]
 bio = "3.0.0"
 colored = "3"
