@@ -68,11 +68,11 @@ flowchart TD
 ## Examples
 
 ```bash
-cargo run --release -- --query nl43 --distance 1 --assay random-reverse --file1 ./sim_data/mockseq_r1.fasta --file2 ./sim_data/mockseq_r2.fasta -o ./
+cargo run --release -- --query nl43 --distance 1 --assay random-reverse --file1 ./sim_data/mock_data_r1.fasta.gz --file2 ./sim_data/mock_data_r2.fasta.gz -o ./
 ```
 
 ```bash
-./virust-splicing -q nl43 -d 1 -a random-reverse -1 ./sim_data/mockseq_r1.fasta -2 ./sim_data/mockseq_r2.fasta -o ./
+./virust-splicing -q nl43 -d 1 -a random-reverse -1 ./sim_data/mock_data_r1.fasta.gz -2 ./sim_data/mock_data_r2.fasta.gz -o ./
 ```
 
 <small>Note that inputs use '-' instead of '\_' , use assay "random-reverse" instead of "random_reverse"</small>

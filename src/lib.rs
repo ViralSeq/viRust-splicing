@@ -177,13 +177,7 @@ pub fn open_fasta_file(
 /// * `seq` - A byte slice representing the sequence to be checked
 /// # Returns
 /// * `bool` - Returns true if a homopolymer longer than the threshold is found
-/// # Example
-/// ```
-/// let seq = b"AAACCCCTTTTTTTTTTTTGGG";
-/// assert!(homopolymer_check(seq));
-/// let seq2 = b"AAACCCCTTTTGGG";
-/// assert!(!homopolymer_check(seq2));
-/// ```
+
 fn homopolymer_check(seq: &[u8]) -> bool {
     let max_homopolymer_length = 10; // TODO consider moving to master config
     let mut current_char = 0;
