@@ -8,6 +8,7 @@ exclude = [
     "sample_data/*",
 ]
 description = "High-performance command-line program for analyzing HIV-1 splicing patterns from NGS data."
+authors = ["Shuntai Zhou <shuntai.zhou@gmail.com>", "Michael Clark <clarkmu@gmail.com>"]
 
 license = "MIT"
 repository = "https://github.com/ViralSeq/viRust-splicing"
