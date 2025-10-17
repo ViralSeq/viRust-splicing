@@ -69,7 +69,8 @@ feature_data <- read_csv("run_features.csv") %>%
     `Ref Strain` = reference_strain,
     `Mismatch allowed` = distance,
     Assay = assay
-  ) %>% select(-(1:5))
+  ) %>% select(-(1:5)) %>% 
+  arrange(`Sample ID`)
 
 feature_data %>% kable(format = "markdown")
 ```

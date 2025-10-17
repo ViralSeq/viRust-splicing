@@ -4,6 +4,7 @@
 ![Rust](https://img.shields.io/badge/language-Rust-orange)
 ![GitHub last commit](https://img.shields.io/github/last-commit/ViralSeq/viRust-splicing)
 ![GitHub repo size](https://img.shields.io/github/repo-size/ViralSeq/viRust-splicing)
+![Crates.io](https://img.shields.io/crates/d/virust-splicing)
 ![GitHub Repo stars](https://img.shields.io/github/stars/ViralSeq/viRust-splicing?style=social)
 
 **viRust-splicing** is a high-performance command-line program written in Rust for analyzing HIV-1 splicing patterns from UMI/Primer-ID–based next-generation sequencing (NGS) data.
