@@ -6,7 +6,7 @@ default-run = "virust-splicing"
 
 exclude = [
     "sample_data/**",
-    "tests/**",
+    "tests/quarto/**",
     "tests/multi_report/test_output/**"
 ]
 keywords = ["HIV", "splicing", "NGS", "bioinformatics", "virology"]
