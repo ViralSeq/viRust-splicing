@@ -35,7 +35,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install cross for ARM
+      - name: Install cross for ARM (Linux)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
         run: cargo install cross
 
@@ -46,6 +46,7 @@ jobs:
           else
             cargo build --release --target ${{ matrix.target }} --bins
           fi
+        shell: bash
 
       - name: Package all binaries
         shell: bash
@@ -54,11 +55,13 @@ jobs:
           RELEASE_NAME="virust-splicing-${{ github.ref_name }}-${{ matrix.target }}"
           mkdir -p dist
 
-          # Gather all binaries (files with no extension, or .exe on Windows)
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            # Copy all .exe binaries into dist
             cp "$TARGET_DIR"/*.exe dist/
+            # Compress using PowerShell command but invoked from Bash
             powershell Compress-Archive dist "${RELEASE_NAME}.zip"
           else
+            # Copy all binaries (no extension)
             cp "$TARGET_DIR"/* dist/
             tar czf "${RELEASE_NAME}.tar.gz" -C dist .
           fi
@@ -80,7 +83,7 @@ jobs:
         with:
           path: dist
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/**/*
