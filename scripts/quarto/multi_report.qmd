@@ -62,7 +62,14 @@ theme_set(theme_bw())
 ```{r, results = 'asis'}
 # read feature files 
 
-feature_data <- read_csv("run_features.csv")
+feature_data <- read_csv("run_features.csv") %>% 
+  mutate(
+    distance = paste(distance, "base"),
+    `Sample ID` = sample_name,
+    `Ref Strain` = reference_strain,
+    `Mismatch allowed` = distance,
+    Assay = assay
+  ) %>% select(-(1:5))
 
 feature_data %>% kable(format = "markdown")
 ```
@@ -316,6 +323,19 @@ data_d1 %>% tableby( id ~ main_acceptor_after_d1 , data = .) %>% summary(
 
 <div style="margin-top: 4em;"></div>
 
+```{r}
+
+data_d1 %>% 
+  ggplot(aes(x = id, fill = main_acceptor_after_d1)) +
+  geom_bar(position = "fill") + 
+  scale_fill_nejm(name = "Main Acceptor After D1") + 
+  labs(
+    x = "Sample ID",
+    y = "Proportion",
+  )
+```
+
+<div style="margin-top: 4em;"></div>
 
 ### Acceptor after D1 by main type of D1
 
@@ -324,6 +344,21 @@ data_d1 %>% tableby( D1_type_revised2 ~ main_acceptor_after_d1 , data = .) %>% s
   title = "Acceptor After D1 by main D1 types"
 )
 ```
+
+<div style="margin-top: 4em;"></div>
+
+```{r}
+
+data_d1 %>% 
+  ggplot(aes(x = D1_type_revised2, fill = main_acceptor_after_d1)) +
+  geom_bar(position = "fill") + 
+  scale_fill_nejm(name = "Main Acceptor After D1") + 
+  labs(
+    x = "Main type of D1",
+    y = "Proportion",
+  )
+```
+
 
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
 
@@ -338,6 +373,20 @@ data_d1 %>% tableby( id ~ final_des , data = .) %>% summary(
 
 <div style="margin-top: 4em;"></div>
 
+```{r}
+
+data_d1 %>% 
+  ggplot(aes(x = id, fill = final_des)) +
+  geom_bar(position = "fill") + 
+  scale_fill_nejm(name = "Final Destination") + 
+  labs(
+    x = "Sample ID",
+    y = "Proportion",
+  )
+```
+
+
+<div style="margin-top: 4em;"></div>
 
 ### Final Desitnation by main type of D1
 
@@ -345,6 +394,21 @@ data_d1 %>% tableby( id ~ final_des , data = .) %>% summary(
 data_d1 %>% tableby( D1_type_revised2 ~ final_des , data = .) %>% summary(
   title = "Final desitinations by sample"
 )
+```
+
+
+<div style="margin-top: 4em;"></div>
+
+```{r}
+
+data_d1 %>% 
+  ggplot(aes(x = D1_type_revised2, fill = final_des)) +
+  geom_bar(position = "fill") + 
+  scale_fill_nejm(name = "Final Destination") + 
+  labs(
+    x = "Main type of D1",
+    y = "Proportion",
+  )
 ```
 
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
