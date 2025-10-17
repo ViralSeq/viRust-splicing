@@ -65,7 +65,6 @@ library(base64enc)
 theme_set(theme_bw())
 ```
 
-
 ```{r}
 if (!py_module_available("pandas")) {
   py_install("pandas")
@@ -76,7 +75,6 @@ if (!py_module_available("plotly")) {
 } else {message("plotly installed")}
 
 ```
-
 
 ```{r}
 
@@ -93,13 +91,13 @@ assay_type <- assay_type %>% toupper()
 strain <- strain %>% toupper()
 ```
 
-
-
 ```{r}
 # Read data
-
 data <- read_csv(summary_data_path)
+```
 
+```{r}
+# Annotate data
 data <- data  %>%
   mutate(
     main_acceptor_after_d1 = case_when(
@@ -119,6 +117,12 @@ data <- data  %>%
 list_GC_1 <- c("GCTGAAGCGCGCACG") # use GC after DIS
 list_GC_2 <- c("CGCGCACGGCAAGAG") # use GC 5 base down first GC
 
+list_D1_primer <- c(
+  "GCGCGCACGGCAAGA",
+  "CGGCAAGAGGCGAGA",
+  "CAGGACTCGGCTTGA"
+)
+
 list_GT_gag_AUG <- c("GAAGGAGAGAGATGG")
 
 list_GT_gag_down <- c("GGTGCGAGAGCGTCG")
@@ -131,17 +135,17 @@ data <- data %>%
     D1_type_revised = case_when(
       (spliced == "spliced" & (alternative_d1_used_common %in% list_GC_1)) ~ "GC 3 base downstream of DIS",
       (spliced == "spliced" & (alternative_d1_used_common %in% list_GC_2)) ~ "GC 10 base downstream of DIS",
+      (spliced == "spliced" & (D1_type == "D1prime")) ~ "D1prime",
+      (spliced == "spliced" & (alternative_d1_used_common %in% list_D1_primer)) ~ "D1prime",
       (spliced == "spliced" & (alternative_d1_used_common %in% list_GT_gag_AUG)) ~ "GU downstream gag AUG",
       (spliced == "spliced" & (alternative_d1_used_common %in% list_GT_gag_down)) ~ "GU further downstream in gag",
       (spliced == "spliced" & alternative_d1_used_common != "None") ~ "Others",
       T ~ D1_type_revised
     ),
+    D1_type = ifelse(D1_type_revised == "D1prime", "D1prime", D1_type), 
+
   )
-```
 
-
-```{r}
-# Here we merge the splice isoform information with the data
 splice_form_data <- read_csv(splice_isoform_csv)
 data <- data %>%
   left_join(splice_form_data, by = c("splice_category_2" = "SpliceForm"))
@@ -149,47 +153,7 @@ data <- data %>%
 data = data %>% mutate(
     splice_cat2  = splice_cat2 %>%  ff_label("Splice isoforms (Shortened)"),
     splice_category_2 = splice_category_2 %>%  ff_label("Splice isoforms (Extended)"),
-    size_class.x = size_class.x %>% ff_label("Size class")
-  )
-
-# get main donor after D1
-
-data <- data %>%
-  mutate(
-    main_acceptor_after_d1 = case_when(
-      str_detect(splice_category_2, "D1_A1") ~ "A1",
-      str_detect(splice_category_2, "D1_A2") ~ "A2",
-      str_detect(splice_category_2, "D1_A3") ~ "A3",
-      str_detect(splice_category_2, "D1_A4") ~ "A4",
-      str_detect(splice_category_2, "D1_A5") ~ "A5",
-      str_detect(splice_category_2, "D1_A7") ~ "A7"
-    ),
-    main_acceptor_after_d1 = ifelse(spliced == "unspliced", "unspliced", main_acceptor_after_d1),
-    main_acceptor_after_d1 = ff_label(main_acceptor_after_d1, "Main Acceptor After D1")
-  )
-
-# define alternative D1
-
-list_GC_1 <- c("GCTGAAGCGCGCACG") # use GC after DIS
-list_GC_2 <- c("CGCGCACGGCAAGAG") # use GC 5 base down first GC
-
-list_GT_gag_AUG <- c("GAAGGAGAGAGATGG")
-
-list_GT_gag_down <- c("GGTGCGAGAGCGTCG")
-
-data <- data %>%
-  mutate(
-    D1_type_revised = ifelse((spliced == "spliced" & D1_type != "Alternative D1"), D1_type, NA)
-  ) %>%
-  mutate(
-    D1_type_revised = case_when(
-      (spliced == "spliced" & (alternative_d1_used_common %in% list_GC_1)) ~ "GC 3 base downstream of DIS",
-      (spliced == "spliced" & (alternative_d1_used_common %in% list_GC_2)) ~ "GC 10 base downstream of DIS",
-      (spliced == "spliced" & (alternative_d1_used_common %in% list_GT_gag_AUG)) ~ "GU downstream gag AUG",
-      (spliced == "spliced" & (alternative_d1_used_common %in% list_GT_gag_down)) ~ "GU further downstream in gag",
-      (spliced == "spliced" & alternative_d1_used_common != "None") ~ "Others",
-      T ~ D1_type_revised
-    ),
+    size_class.x = size_class.x %>% ff_label("Size class"),
     D1_type = ff_label(D1_type, "D1 types"),
     final_des = factor(final_des, levels = c("A3", "A4", "A5", "A7", "vif", "vpr", "Incomplete")),
     final_des = ff_label(final_des, "Final Destinations"),
@@ -208,6 +172,10 @@ data <- data %>%
     D1_type_revised = ff_label(D1_type_revised, "Detailed D1 types"),
   )
 
+```
+
+```{r}
+# prepare data for alluvial plot
 df_alluvium <- data %>% group_by(splice_cat2) %>%
   mutate(splice_category_count = n())
 
@@ -221,7 +189,6 @@ cut_off_to_show = n * 0.03
 df_alluvium_transformed <- df_alluvium_short %>% pivot_longer(cols = 1:8, names_to = "Steps")
 
 ```
-
 
 ```{r}
 # helper function for download

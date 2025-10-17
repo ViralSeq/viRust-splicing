@@ -162,7 +162,7 @@ impl SpliceEvents {
                 // if we find an A7 event, we know it is 1.8kb, nef transcript
                 self.size_class = Some(SizeClass::OnePointEightKb);
                 return Ok(());
-            } else if event == "unknown" || event == "noD1" {
+            } else if event == "unknown" || event == "no-acceptor" {
                 self.size_class = Some(SizeClass::Unknown);
                 return Ok(());
             } else if event == "D1-unspliced" || event == "gag-AUG" {

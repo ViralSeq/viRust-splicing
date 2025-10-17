@@ -1,12 +1,15 @@
 [package]
 name = "virust-splicing"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 default-run = "virust-splicing"
 
 exclude = [
-    "sample_data/*",
+    "sample_data/**",
+    "tests/**",
+    "tests/multi_report/test_output/**"
 ]
+keywords = ["HIV", "splicing", "NGS", "bioinformatics", "virology"]
 description = "High-performance command-line program for analyzing HIV-1 splicing patterns from NGS data."
 authors = ["Shuntai Zhou <shuntai.zhou@gmail.com>", "Michael Clark <clarkmu@gmail.com>"]
 
@@ -27,9 +30,11 @@ rand = "0.9.2"
 rand_chacha = "0.9"
 rand_distr = "0.5"
 plotters = "0.3"
-regex = "1.11.3"
-clap = { version = "4.5.48", features = ["derive"] }
+regex = "1.12.2"
+clap = { version = "4.5.49", features = ["derive"] }
 flate2 = "1.1.4"
+getset = "0.1.6"
+anyhow = "1.0"
 
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["html_reports"] }

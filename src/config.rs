@@ -24,7 +24,6 @@ use std::process;
 
 /// Configuration parsed from CLI input arguments for initiating the splicing pipeline.
 #[derive(Debug, Clone, Parser)]
-///TODO review name/about information below.  Can reimplement version information from ENV here if we start using versioning
 #[command(
     name = "viRust-splicing",
     version = env!("CARGO_PKG_VERSION"),

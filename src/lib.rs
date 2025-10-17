@@ -11,6 +11,7 @@ use std::path::Path;
 pub mod config;
 pub mod io;
 pub mod joined_umi_sequence;
+pub mod multi_report_config;
 pub mod ref_sequence;
 pub mod runner;
 pub mod splice_events;

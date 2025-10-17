@@ -16,7 +16,8 @@ packages <- c(
   "ggnewscale",
   "scico",
   "jsonlite",
-  "base64enc"
+  "base64enc",
+  "scales"
 )
 
 # Install packages that are not already installed
