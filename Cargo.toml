@@ -6,8 +6,7 @@ default-run = "virust-splicing"
 
 exclude = [
     "sample_data/**",
-    "tests/quarto/**",
-    "tests/multi_report/test_output/**"
+    "tests/**",
 ]
 keywords = ["HIV", "splicing", "NGS", "bioinformatics", "virology"]
 description = "High-performance command-line program for analyzing HIV-1 splicing patterns from NGS data."
