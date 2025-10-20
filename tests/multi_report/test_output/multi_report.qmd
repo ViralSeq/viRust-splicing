@@ -27,7 +27,7 @@ execute:
   message: false
 ---
 
-Report generated on `r format(Sys.time(), "%Y-%m-%d %H:%M:%S")`
+Report generated on `r format(Sys.time(), "%Y-%m-%d %H:%M:%S")` using `mulit_report` tool from [`virust-splicing`](https://github.com/ViralSeq/viRust-splicing)
 
 <div style="text-align: center; font-size: 1.5em; margin: 1em 0;">✦ ✦ ✦</div>
 
