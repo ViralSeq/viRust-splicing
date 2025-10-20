@@ -9,7 +9,7 @@
 
 **viRust-splicing** is a high-performance command-line program written in Rust for analyzing HIV-1 splicing patterns from UMI/Primer-ID–based next-generation sequencing (NGS) data.
 
-It parses paired-end FASTQ/FASTA files (also support .gz files), maps donor–acceptor sites, quantifies splice isoforms, and generates structured outputs suitable for downstream statistical analysis and visualization.Rust App to analyze NGS data to detect HIV splice forms.
+It parses paired-end FASTQ/FASTA files (also supports .gz files), maps donor–acceptor sites, quantifies splice isoforms, and generates structured outputs suitable for downstream statistical analysis and visualization.
 
 ## Key Features
 
