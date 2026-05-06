@@ -493,6 +493,11 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
     padding:4px 10px; font-size:12px; cursor:pointer;
   }
   #splice_map .hint button:hover{filter:brightness(.96);}
+  
+  /* Export buttons container */
+  #splice_map .hint .export-buttons{
+    display:flex; gap:6px; flex-wrap:wrap; justify-content:center;
+  }
 </style>
 
 <div id="splice_map" class="wrap">
@@ -503,12 +508,17 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
         <span>Scroll to zoom • Drag to pan ↔️</span>
       </div>
       <button id="resetZoomBtn" type="button">Reset Scale</button>
+      <div class="export-buttons">
+        <button id="exportSvgBtn" type="button">📥 Export SVG</button>
+        <button id="exportPngBtn" type="button">📥 Export PNG</button>
+      </div>
     </div>
     <svg id="stage"></svg>
   </div>
 </div>
 
 <script src="https://unpkg.com/d3@7"></script>
+<script src="https://unpkg.com/save-svg-as-png@1.4.17/lib/saveSvgAsPng.js"></script>
 <script>
 (function(){
   // ========= DATA ===========================================================
@@ -722,6 +732,81 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
   // ========= RESET BUTTON ===================================================
   document.getElementById("resetZoomBtn").addEventListener("click",()=>{
     svg.transition().duration(300).call(zoom.transform,d3.zoomIdentity);
+  });
+
+  // ========= EXPORT FUNCTIONS ================================================
+  function downloadFile(data, filename, mimeType) {
+    const blob = new Blob([data], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function prepareCloneForExport(svgElement) {
+    const clone = svgElement.cloneNode(true);
+    
+    // Apply critical CSS styles as attributes to ensure they're preserved
+    clone.querySelectorAll("path.link").forEach(el => {
+      el.setAttribute("fill", "none");
+      el.style.strokeOpacity = "0.35";
+      el.style.pointerEvents = "stroke";
+    });
+    
+    clone.querySelectorAll("text.arc-label").forEach(el => {
+      el.style.opacity = "0";
+    });
+    
+    clone.querySelectorAll("circle").forEach(el => {
+      if (el.getAttribute("r") === "4.5") {
+        el.setAttribute("fill", "#1f77b4");
+        el.setAttribute("stroke", "#0b3a6f");
+      }
+    });
+    
+    clone.querySelectorAll("line.anchor-stem").forEach(el => {
+      el.setAttribute("stroke", "#cdd3e1");
+    });
+    
+    clone.querySelectorAll("rect").forEach(el => {
+      el.setAttribute("rx", "6");
+      el.setAttribute("ry", "6");
+    });
+    
+    return clone;
+  }
+
+  // Export as SVG
+  document.getElementById("exportSvgBtn").addEventListener("click", () => {
+    const svgElement = document.getElementById("stage");
+    const clone = prepareCloneForExport(svgElement);
+    
+    const serializer = new XMLSerializer();
+    let svgString = serializer.serializeToString(clone);
+    const svgWithXML = '<?xml version="1.0" encoding="UTF-8"?>\n' + svgString;
+    const timestamp = new Date().toISOString().slice(0, 10);
+    downloadFile(svgWithXML, `splice-map-${timestamp}.svg`, "image/svg+xml");
+  });
+
+  // Export as PNG using save-svg-as-png
+  document.getElementById("exportPngBtn").addEventListener("click", () => {
+    const svgElement = document.getElementById("stage");
+    const timestamp = new Date().toISOString().slice(0, 10);
+    
+    const clone = prepareCloneForExport(svgElement);
+    
+    // Use save-svg-as-png library with proper background
+    saveSvgAsPng(clone, `splice-map-${timestamp}.png`, {
+      backgroundColor: "#2b3b4b",
+      scale: window.devicePixelRatio || 1
+    }).catch(err => {
+      console.error("PNG export failed:", err);
+      alert("Failed to export as PNG: " + err.message);
+    });
   });
 })();
 </script>
