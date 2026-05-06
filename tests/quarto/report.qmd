@@ -750,11 +750,29 @@ Splice events from Dx to Ax, indicated in **Percentage among all SPLICED sequenc
   function prepareCloneForExport(svgElement) {
     const clone = svgElement.cloneNode(true);
     
+    // Add background rect to SVG for consistent dark background
+    const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    bgRect.setAttribute("width", "100%");
+    bgRect.setAttribute("height", "100%");
+    bgRect.setAttribute("fill", "#2b3b4b");
+    clone.insertBefore(bgRect, clone.firstChild);
+    
     // Apply critical CSS styles as attributes to ensure they're preserved
     clone.querySelectorAll("path.link").forEach(el => {
       el.setAttribute("fill", "none");
       el.style.strokeOpacity = "0.35";
       el.style.pointerEvents = "stroke";
+    });
+    
+    clone.querySelectorAll("path.connector").forEach(el => {
+      // Get computed styles from original element
+      const original = svgElement.querySelector("path.connector");
+      if (original) {
+        const computed = getComputedStyle(original);
+        el.setAttribute("fill", "none");
+        el.setAttribute("stroke", computed.stroke);
+        el.setAttribute("stroke-width", computed.strokeWidth);
+      }
     });
     
     clone.querySelectorAll("text.arc-label").forEach(el => {
