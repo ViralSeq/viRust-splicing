@@ -110,9 +110,9 @@ Use `--umi auto-model` to choose `max-model` or `cluster-model` independently fo
 `final_category`. Auto mode first calculates the unique-UMI fraction:
 
 $$
-\text{unique\_umi\_fraction} =
-\frac{\text{distinct\_umis}}
-{\text{reads\_in\_final\_category}}
+f_{\mathrm{unique}} =
+\frac{N_{\mathrm{distinct}}}
+{N_{\mathrm{reads}}}
 $$
 
 When that fraction is at most `0.10`, auto mode selects `max-model`: on average, each distinct UMI
