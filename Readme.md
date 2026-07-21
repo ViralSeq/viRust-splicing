@@ -137,6 +137,7 @@ with
 - $L$: UMI length
 - $d$: maximum mismatch distance
 - $N_{\mathrm{UMI}}$: number of distinct UMIs of length $L$
+- $\binom{L}{k}$ is the binomial coefficient (”L choose k”), representing the number of ways to choose k positions from a UMI of length L.
 
 The calculation is performed separately for each observed UMI length, and the largest lambda is
 used for the category. Auto mode selects `max-model` when lambda is greater than or equal to
