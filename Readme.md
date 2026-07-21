@@ -120,7 +120,7 @@ has at least 10 reads of coverage. For sparser categories, it estimates the expe
 random, unrelated UMI neighbors within the clustering radius (`lambda`):
 
 $$
-\lambda = \frac{(N_{\mathrm{UMI}} - 1)\,N_{\mathrm{neighbor}}}
+\lambda = \frac{(N_{\mathrm{UMI}} - 1) \cdot N_{\mathrm{neighbor}}}
 {4^{L} - 1},
 $$
 
