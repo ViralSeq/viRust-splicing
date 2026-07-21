@@ -110,8 +110,7 @@ Use `--umi auto-model` to choose `max-model` or `cluster-model` independently fo
 `final_category`. Auto mode first calculates the unique-UMI fraction:
 
 $$
-\text{unique\_umi\_fraction}
-=
+\text{unique\_umi\_fraction} =
 \frac{\text{distinct\_umis}}
 {\text{reads\_in\_final\_category}}
 $$
@@ -121,16 +120,14 @@ has at least 10 reads of coverage. For sparser categories, it estimates the expe
 random, unrelated UMI neighbors within the clustering radius (`lambda`):
 
 $$
-\lambda =
-\frac{(N_{\mathrm{UMI}} - 1)\,N_{\mathrm{neighbor}}}
+\lambda = \frac{(N_{\mathrm{UMI}} - 1)\,N_{\mathrm{neighbor}}}
 {4^{L} - 1},
 $$
 
 where
 
 $$
-N_{\mathrm{neighbor}}
-=
+N_{\mathrm{neighbor}} =
 \sum_{k=1}^{d}
 \binom{L}{k}3^k,
 $$
