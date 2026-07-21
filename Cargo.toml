@@ -1,6 +1,6 @@
 [package]
 name = "virust-splicing"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 default-run = "virust-splicing"
 
@@ -16,27 +16,27 @@ license = "MIT"
 repository = "https://github.com/ViralSeq/viRust-splicing"
 
 [dependencies]
-bio = "3.0.0"
+bio = "4.0.1"
 colored = "3"
-serde = "1.0.228"
-serde_json = "1.0.145"
+serde = "1.0.229"
+serde_json = "1.0.151"
 tap = "1"
-config = "0.15.18"
-rayon = "1.11"
-itertools = "0.14"
+config = "0.15.25"
+rayon = "1.12"
+itertools = "0.15.0"
 csv = "1.4.0"
-rand = "0.9.2"
-rand_chacha = "0.9"
-rand_distr = "0.5"
+rand = "0.10.2"
+rand_chacha = "0.10.0"
+rand_distr = "0.6.0"
 plotters = "0.3"
-regex = "1.12.2"
-clap = { version = "4.5.49", features = ["derive"] }
-flate2 = "1.1.4"
-getset = "0.1.6"
+regex = "1.13.1"
+clap = { version = "4.6.3", features = ["derive"] }
+flate2 = "1.1.9"
+getset = "0.1.7"
 anyhow = "1.0"
 
 [dev-dependencies]
-criterion = { version = "0.7.0", features = ["html_reports"] }
+criterion = { version = "0.8.2", features = ["html_reports"] }
 
 [[bench]]
 name = "my_benchmark"

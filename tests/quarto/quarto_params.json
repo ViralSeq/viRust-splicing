@@ -1,1 +1,1 @@
-{"version":"0.2.0","assay_type":"random-reverse","strain":"test-strain","mismatch":1,"file1":"r1.fastq.gz","file2":"r2.fastq.gz","summary_data_file":"output_summary.csv"}
+{"version":"0.2.2","assay_type":"random-reverse","strain":"test-strain","mismatch":1,"umi_family_model":"max-model","umi_min_fraction":0.005,"umi_auto_neighbor_risk":0.05,"umi_auto_coverage_ratio":0.1,"header_match":"not applied","file1":"r1.fastq.gz","file2":"r2.fastq.gz","summary_data_file":"output_summary.csv"}

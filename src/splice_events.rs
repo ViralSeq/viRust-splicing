@@ -6,6 +6,12 @@
 /// - `post_splice_sequence` (`Option<String>`): The sequence after the last splicing site, used to check size class.
 /// - `umi` (`String`): The unique molecular identifier.
 /// - `umi_family` (`Option<String>`): The UMI family, if identified.
+/// - `umi_family_size` (`Option<usize>`): The number of reads in the UMI family.
+/// - `umi_family_fraction` (`Option<f64>`): The fraction of final-category reads in the family.
+/// - `umi_model_used` (`Option<String>`): The effective UMI-family model for the final category.
+/// - `umi_unique_count` (`Option<usize>`): The number of distinct UMIs in the final category.
+/// - `umi_unique_fraction` (`Option<f64>`): The distinct-UMI fraction in the final category.
+/// - `umi_neighbor_risk` (`Option<f64>`): Auto-model random-neighbor risk, when calculated.
 /// - `splice_category` (`SpliceChain`): The category of splicing events.
 /// - `size_class` (`Option<SizeClass>`): The size class of the splicing event.
 /// - `final_category` (`Option<String>`): The final predicted category of the splicing event.
@@ -44,9 +50,9 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use crate::config::{SpliceAssayType, SpliceConfig};
+use crate::config::{SpliceAssayType, SpliceConfig, UmiFamilyModel};
 use crate::joined_umi_sequence::{JoinedUmiSequnce, pattern_search};
-use crate::umi::find_umi_family;
+use crate::umi::{find_umi_family_assignments, select_umi_family_model};
 
 /// MARK: SpliceEvents
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -56,6 +62,12 @@ pub struct SpliceEvents {
     pub post_splice_sequence: Option<String>, // sequence post last splicing site that can be identified. used to check size class.
     pub umi: String,
     pub umi_family: Option<String>,
+    pub umi_family_size: Option<usize>,
+    pub umi_family_fraction: Option<f64>,
+    pub umi_model_used: Option<String>,
+    pub umi_unique_count: Option<usize>,
+    pub umi_unique_fraction: Option<f64>,
+    pub umi_neighbor_risk: Option<f64>,
     pub splice_category: SpliceChain,
     pub size_class: Option<SizeClass>,
     pub final_category: Option<String>,
@@ -85,7 +97,7 @@ pub enum SizeClass {
     Unspliced,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug)]
 pub struct ProcessedSpliceRec<'a> {
     pub seq: &'a [u8],
     pub alternative_d1: Option<&'a [u8]>, // the alternative donor site if D1 is not found. Only store the sequence when we find an acceptor without D1.
@@ -122,6 +134,12 @@ impl SpliceEvents {
         let sequence_id = joined_umi.sequence_id.clone();
         let umi = joined_umi.umi.clone();
         let umi_family = None;
+        let umi_family_size = None;
+        let umi_family_fraction = None;
+        let umi_model_used = None;
+        let umi_unique_count = None;
+        let umi_unique_fraction = None;
+        let umi_neighbor_risk = None;
         let search_sequence = joined_umi.find_sequence_for_search().clone();
         let post_splice_sequence = None;
         let size_class = None;
@@ -135,6 +153,12 @@ impl SpliceEvents {
             post_splice_sequence,
             umi,
             umi_family,
+            umi_family_size,
+            umi_family_fraction,
+            umi_model_used,
+            umi_unique_count,
+            umi_unique_fraction,
+            umi_neighbor_risk,
             splice_category,
             size_class,
             final_category,
@@ -283,6 +307,8 @@ impl SpliceEvents {
 /// - `sequence_id`: The identifier for the sequence.
 /// - `umi`: The unique molecular identifier.
 /// - `umi_family`: The UMI family, or "None" if not present.
+/// - `umi_family_size`: The number of reads in the UMI family, or "None" if not present.
+/// - `umi_family_fraction`: The fraction of category reads in the UMI family, or "None".
 /// - `splice_category.splice_event`: A joined string of splice events separated by underscores.
 /// - `size_class`: The size class, or "Unknown" if not specified.
 /// - `final_category`: The final category, or "Unknown" if not specified.
@@ -293,10 +319,26 @@ impl Display for SpliceEvents {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             self.sequence_id,
             self.umi,
             self.umi_family.as_deref().unwrap_or("None"),
+            self.umi_family_size
+                .map(|size| size.to_string())
+                .unwrap_or_else(|| "None".to_string()),
+            self.umi_family_fraction
+                .map(|fraction| format!("{fraction:.6}"))
+                .unwrap_or_else(|| "None".to_string()),
+            self.umi_model_used.as_deref().unwrap_or("None"),
+            self.umi_unique_count
+                .map(|count| count.to_string())
+                .unwrap_or_else(|| "None".to_string()),
+            self.umi_unique_fraction
+                .map(|fraction| format!("{fraction:.6}"))
+                .unwrap_or_else(|| "None".to_string()),
+            self.umi_neighbor_risk
+                .map(|risk| format!("{risk:.6}"))
+                .unwrap_or_else(|| "None".to_string()),
             self.splice_category.splice_event.join("_"), // TODO: add a refining function before joining
             self.size_class
                 .as_ref()
@@ -339,22 +381,52 @@ impl Display for SizeClass {
 /// MARK: FIND UMI FAMILY
 // TODO: This function uses multiple HashMaps and Vecs to store the data. It is not very efficient. Consider optimizing it.
 // add a way to find the common alternative_d1 and unknown_sequence_after_d1 for each umi family.
-pub fn find_umi_family_from_events(events: Vec<SpliceEvents>) -> Vec<SpliceEvents> {
+pub fn find_umi_family_from_events(
+    events: Vec<SpliceEvents>,
+    umi_family_model: &UmiFamilyModel,
+    max_mismatches: u8,
+    umi_min_fraction: f64,
+    umi_auto_neighbor_risk: f64,
+) -> Vec<SpliceEvents> {
     let events_by_final_category = group_by_final_category(events);
     let mut outcome_events = Vec::new();
 
-    for events in events_by_final_category.values() {
+    for mut events in events_by_final_category.into_values() {
         let umis: Vec<&str> = events.iter().map(|event| event.umi.as_str()).collect();
+        let model_decision = select_umi_family_model(
+            &umis,
+            umi_family_model,
+            max_mismatches,
+            umi_auto_neighbor_risk,
+        );
 
-        let families = find_umi_family(umis);
+        let family_assignments = find_umi_family_assignments(
+            umis,
+            &model_decision.effective_model,
+            max_mismatches,
+            umi_min_fraction,
+        );
+        let mut family_sizes: HashMap<&str, usize> = HashMap::new();
+        for umi in events.iter().map(|event| event.umi.as_str()) {
+            if let Some(family) = family_assignments.get(umi) {
+                *family_sizes.entry(family).or_default() += 1;
+            }
+        }
+        let category_size = events.len() as f64;
+        let model_used = model_decision.effective_model.to_string();
 
-        outcome_events.extend(events.iter().map(|event| {
-            let mut new_event = event.clone();
-            new_event.umi_family = families
-                .iter()
-                .find(|&&x| x == event.umi)
-                .map(|_| event.umi.clone());
-            new_event
+        outcome_events.extend(events.drain(..).map(|mut event| {
+            event.umi_model_used = Some(model_used.clone());
+            event.umi_unique_count = Some(model_decision.unique_umi_count);
+            event.umi_unique_fraction = Some(model_decision.unique_umi_fraction);
+            event.umi_neighbor_risk = model_decision.neighbor_risk;
+            if let Some(family) = family_assignments.get(event.umi.as_str()) {
+                event.umi_family = Some(family.clone());
+                let family_size = family_sizes[family.as_str()];
+                event.umi_family_size = Some(family_size);
+                event.umi_family_fraction = Some(family_size as f64 / category_size);
+            }
+            event
         }));
     }
 
@@ -364,13 +436,9 @@ pub fn find_umi_family_from_events(events: Vec<SpliceEvents>) -> Vec<SpliceEvent
 fn group_by_final_category(events: Vec<SpliceEvents>) -> HashMap<String, Vec<SpliceEvents>> {
     let mut category_map: HashMap<String, Vec<SpliceEvents>> = HashMap::new();
 
-    for event in events.iter() {
-        let category = event.final_category.as_ref().unwrap();
-        if category_map.contains_key(category) {
-            category_map.get_mut(category).unwrap().push(event.clone());
-        } else {
-            category_map.insert(category.clone(), vec![event.clone()]);
-        }
+    for event in events {
+        let category = event.final_category.as_ref().unwrap().clone();
+        category_map.entry(category).or_default().push(event);
     }
 
     category_map
@@ -451,6 +519,12 @@ mod tests {
             post_splice_sequence: None,
             umi: "TTTTCCTAGGATATGGCTCCATAACTTAGGACAA".to_string(),
             umi_family: None,
+            umi_family_size: None,
+            umi_family_fraction: None,
+            umi_model_used: None,
+            umi_unique_count: None,
+            umi_unique_fraction: None,
+            umi_neighbor_risk: None,
             splice_category: SpliceChain {
                 splice_event: vec!["test".to_string()],
             },
@@ -541,6 +615,12 @@ mod tests {
             post_splice_sequence: None,
             umi: "TTTTCCTAGGATATGGCTCCATAACTTAGGACAA".to_string(),
             umi_family: None,
+            umi_family_size: None,
+            umi_family_fraction: None,
+            umi_model_used: None,
+            umi_unique_count: None,
+            umi_unique_fraction: None,
+            umi_neighbor_risk: None,
             splice_category: SpliceChain {
                 splice_event: vec![
                     "D1".to_string(),
@@ -560,7 +640,7 @@ mod tests {
 
         assert_eq!(
             splice_event.to_string(),
-            "test\tTTTTCCTAGGATATGGCTCCATAACTTAGGACAA\tNone\tD1_A1_D2_A2_D3_A3\t4kb\tD1_A1_D2_A2_D3_A3_4kb\tNone\tNone"
+            "test\tTTTTCCTAGGATATGGCTCCATAACTTAGGACAA\tNone\tNone\tNone\tNone\tNone\tNone\tNone\tD1_A1_D2_A2_D3_A3\t4kb\tD1_A1_D2_A2_D3_A3_4kb\tNone\tNone"
         );
     }
 
@@ -574,6 +654,12 @@ mod tests {
             post_splice_sequence: None,
             umi: "AAAAA".to_string(),
             umi_family: None,
+            umi_family_size: None,
+            umi_family_fraction: None,
+            umi_model_used: None,
+            umi_unique_count: None,
+            umi_unique_fraction: None,
+            umi_neighbor_risk: None,
             splice_category: SpliceChain {
                 splice_event: vec![
                     "D1".to_string(),
@@ -595,6 +681,12 @@ mod tests {
             post_splice_sequence: None,
             umi: "AAAAA".to_string(),
             umi_family: Some("AAAAA".to_string()),
+            umi_family_size: None,
+            umi_family_fraction: None,
+            umi_model_used: None,
+            umi_unique_count: None,
+            umi_unique_fraction: None,
+            umi_neighbor_risk: None,
             splice_category: SpliceChain {
                 splice_event: vec![
                     "D1".to_string(),
@@ -635,7 +727,8 @@ mod tests {
             events.push(events_template_2.clone());
         }
 
-        let result = find_umi_family_from_events(events.clone());
+        let result =
+            find_umi_family_from_events(events.clone(), &UmiFamilyModel::MaxModel, 1, 0.005, 0.05);
 
         let family: Vec<String> = result
             .iter()
@@ -647,10 +740,22 @@ mod tests {
                     .to_string()
             })
             .collect();
-        let uniq_family: Vec<String> = family.into_iter().unique().collect();
+        let mut uniq_family: Vec<String> = family.into_iter().unique().collect();
+        uniq_family.sort();
 
         assert_eq!(uniq_family.len(), 4);
-        assert_eq!(uniq_family, vec!["AAAAA", "TTTTT", "None", "GGGGG",]);
+        assert_eq!(uniq_family, vec!["AAAAA", "GGGGG", "None", "TTTTT"]);
+
+        let aaaaa_family = result
+            .iter()
+            .find(|event| event.umi == "AAAAA")
+            .expect("AAAAA family should be present");
+        assert_eq!(aaaaa_family.umi_family_size, Some(1000));
+        assert_eq!(aaaaa_family.umi_family_fraction, Some(1000.0 / 1555.0));
+        assert_eq!(aaaaa_family.umi_model_used.as_deref(), Some("max-model"));
+        assert_eq!(aaaaa_family.umi_unique_count, Some(4));
+        assert_eq!(aaaaa_family.umi_unique_fraction, Some(4.0 / 1555.0));
+        assert_eq!(aaaaa_family.umi_neighbor_risk, None);
 
         let group = group_by_final_category(events);
 

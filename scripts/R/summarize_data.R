@@ -54,7 +54,14 @@ data_with_family <- data_with_family %>%
 data_with_family_unique <-
   data_with_family %>%
   select(
-    c(3:6, alternative_d1_used_common, spliced, D1_type, splice_category_2)
+    umi_family,
+    splice_category,
+    size_class,
+    final_category,
+    alternative_d1_used_common,
+    spliced,
+    D1_type,
+    splice_category_2
   ) %>%
   unique()
 
