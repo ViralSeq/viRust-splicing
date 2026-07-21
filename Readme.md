@@ -92,8 +92,8 @@ categories.
 The approach was evaluated using serial dilution of input template RNA. With `max-model`, UMI
 family size showed a strong linear correlation with input-template number, supporting its use when
 the category has sufficient UMI coverage. The underlying Primer ID study is: Zhou S, Jones C,
-Mieczkowski P, Swanstrom R. *Primer ID Validates Template Sampling Depth and Greatly Reduces the
-Error Rate of Next-Generation Sequencing of HIV-1 Genomic RNA Populations.* Journal of Virology
+Mieczkowski P, Swanstrom R. _Primer ID Validates Template Sampling Depth and Greatly Reduces the
+Error Rate of Next-Generation Sequencing of HIV-1 Genomic RNA Populations._ Journal of Virology
 89(16):8540-8555 (2015). [doi:10.1128/JVI.00522-15](https://doi.org/10.1128/JVI.00522-15).
 
 #### Cluster models
@@ -109,20 +109,37 @@ oversized family.
 Use `--umi auto-model` to choose `max-model` or `cluster-model` independently for each
 `final_category`. Auto mode first calculates the unique-UMI fraction:
 
-```text
-unique_umi_fraction = distinct_umis / reads_in_final_category
-```
+$$
+\text{unique\_umi\_fraction}
+=
+\frac{\text{distinct\_umis}}
+{\text{reads\_in\_final\_category}}
+$$
 
 When that fraction is at most `0.10`, auto mode selects `max-model`: on average, each distinct UMI
 has at least 10 reads of coverage. For sparser categories, it estimates the expected number of
 random, unrelated UMI neighbors within the clustering radius (`lambda`):
 
-```text
-lambda = (distinct_umis_of_length - 1) * neighbor_count / (4^umi_length - 1)
+$$
+\lambda =
+\frac{(N_{\mathrm{UMI}} - 1)\,N_{\mathrm{neighbor}}}
+{4^{L} - 1},
+$$
 
-neighbor_count = sum from k = 1 through mismatch_distance of:
-                 C(umi_length, k) * 3^k
-```
+where
+
+$$
+N_{\mathrm{neighbor}}
+=
+\sum_{k=1}^{d}
+\binom{L}{k}3^k,
+$$
+
+with
+
+- $L$: UMI length
+- $d$: maximum mismatch distance
+- $N_{\mathrm{UMI}}$: number of distinct UMIs of length $L$
 
 The calculation is performed separately for each observed UMI length, and the largest lambda is
 used for the category. Auto mode selects `max-model` when lambda is greater than or equal to
