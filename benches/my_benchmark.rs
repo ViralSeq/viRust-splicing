@@ -12,6 +12,7 @@ use tap::Pipe;
 use virust_splicing::config::InputConfig;
 use virust_splicing::config::SpliceAssayType;
 use virust_splicing::config::SpliceConfig;
+use virust_splicing::config::UmiFamilyModel;
 use virust_splicing::joined_umi_sequence::JoinedUmiSequnce;
 use virust_splicing::joined_umi_sequence::pattern_search;
 use virust_splicing::open_fasta_file;
@@ -24,8 +25,12 @@ const SEQUENCE :&[u8] = b"CTATTGTGTGCATCAAAGGATAGATGTAAAAGACACCAAGGAAGCCTTAGATAA
 static CONFIG: LazyLock<InputConfig> = LazyLock::new(|| InputConfig {
     query: "nl43".to_string(),
     distance: 1,
-    filename_r1: "sim_data/mockseq_r1.fasta".to_string(),
-    filename_r2: "sim_data/mockseq_r2.fasta".to_string(),
+    umi_family_model: UmiFamilyModel::MaxModel,
+    umi_min_fraction: 0.005,
+    umi_auto_neighbor_risk: 0.05,
+    header_match: None,
+    filename_r1: "sample_data/mock_data_r1.fasta.gz".to_string(),
+    filename_r2: "sample_data/mock_data_r2.fasta.gz".to_string(),
     assay_type: SpliceAssayType::RandomReverse, // Kmer and SizeSpecific are about 5 times faster than random reverse.
     output_path: None,
 });

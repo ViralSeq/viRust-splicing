@@ -7,17 +7,31 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::Write;
 use std::path::Path;
+use std::time::Instant;
 
 pub mod config;
 pub mod io;
 pub mod joined_umi_sequence;
+pub mod multi_report_config;
 pub mod ref_sequence;
 pub mod runner;
+pub mod sequence_filter;
 pub mod splice_events;
 pub mod umi;
 
 use crate::config::{InputConfig, SpliceConfig};
 use crate::io::*;
+
+fn timing_enabled() -> bool {
+    std::env::var_os("VIRUST_TIMING").is_some()
+}
+
+fn log_timing(stage: &str, start: Instant) -> Instant {
+    if timing_enabled() {
+        eprintln!("[timing] {stage}: {:.2?}", start.elapsed());
+    }
+    Instant::now()
+}
 
 /// Main function to run the viRust-Splicing analysis workflow.
 /// It takes an InputConfig object as input and performs the following steps:
@@ -33,6 +47,7 @@ use crate::io::*;
 /// 9. Checks for Quarto and Python3 installation, and generates an HTML report using Quarto.
 /// The function returns a Result indicating success or failure of the entire workflow.
 pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
+    let mut stage_start = Instant::now();
     let forward_n_size = 4; // TODO consider moving to master config
     let umi_size = 14; // TODO consider moving to master config
 
@@ -41,6 +56,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
     let sequence_files = validate_input_files(r1_file_path, r2_file_path)?;
     let records = open_sequence_files(&sequence_files)?;
+    stage_start = log_timing("read input records", stage_start);
 
     let output_path_str = &config.output_path.clone().unwrap();
     let output_path = Path::new(output_path_str);
@@ -55,6 +71,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     let output_tsv_file = output_path.join(file_name);
 
     let splice_config = SpliceConfig::build_from_input(config.clone())?;
+    stage_start = log_timing("build splice config", stage_start);
 
     #[cfg(debug_assertions)]
     dbg!(&splice_config);
@@ -62,7 +79,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     let splice_events: Vec<_> = records
         .par_iter()
         .filter(|(r1, r2)| !(homopolymer_check(r1.seq()) || homopolymer_check(r2.seq())))
-        .map(|(r1_record, r2_record)| {
+        .filter_map(|(r1_record, r2_record)| {
             let mut joined_umi_sequence = joined_umi_sequence::JoinedUmiSequnce::from_fasta_record(
                 &r1_record,
                 &r2_record,
@@ -72,16 +89,32 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
 
             joined_umi_sequence.join();
 
-            joined_umi_sequence
-                .check_splice_event(&splice_config)
-                .unwrap() // not sure how to pass the error
+            if let Some(header_match) = config.header_match.as_deref() {
+                if !joined_umi_sequence.matches_r1_header(header_match, config.distance) {
+                    return None;
+                }
+            }
+
+            Some(
+                joined_umi_sequence
+                    .check_splice_event(&splice_config)
+                    .unwrap(), // not sure how to pass the error
+            )
         })
         .collect();
+    stage_start = log_timing("detect splice events", stage_start);
 
     #[cfg(debug_assertions)]
     dbg!(println!("{:#?}", splice_events));
 
-    let splice_events_with_umi_family = find_umi_family_from_events(splice_events);
+    let splice_events_with_umi_family = find_umi_family_from_events(
+        splice_events,
+        &config.umi_family_model,
+        config.distance,
+        config.umi_min_fraction,
+        config.umi_auto_neighbor_risk,
+    );
+    stage_start = log_timing("assign UMI families", stage_start);
 
     let mut file = File::create(&output_tsv_file)?;
     println!(
@@ -92,11 +125,12 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     );
     writeln!(
         file,
-        "sequence_id\tumi\tumi_family\tsplice_category\tsize_class\tfinal_category\talternative_d1_used\tunknown_sequence_after_d1"
+        "sequence_id\tumi\tumi_family\tumi_family_size\tumi_family_fraction\tumi_model_used\tumi_unique_count\tumi_unique_fraction\tumi_neighbor_risk\tsplice_category\tsize_class\tfinal_category\talternative_d1_used\tunknown_sequence_after_d1"
     )?;
     for res in splice_events_with_umi_family.iter() {
         writeln!(file, "{}", res.to_string())?;
     }
+    stage_start = log_timing("write TSV", stage_start);
 
     if check_r_installed().is_err() {
         println!("R is not installed or not found in PATH. Skipping data summarization with R.");
@@ -107,6 +141,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
         println!("Required R packages are not installed. Skipping data summarization with R.");
         return Ok(());
     }
+    stage_start = log_timing("check R packages", stage_start);
 
     let output_summary_file = output_path.join(file_base_name.clone() + "_summary.csv");
 
@@ -124,9 +159,11 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
                 .unwrap_or("Error converting path to string...")
         );
     }
+    stage_start = log_timing("summarize data with R", stage_start);
 
     let check_quarto = check_quarto_installed();
     let check_python3 = check_python3_installed();
+    stage_start = log_timing("check report tools", stage_start);
 
     if check_quarto.is_err() || check_python3.is_err() {
         println!(
@@ -140,6 +177,10 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
         &config.assay_type.to_string(),
         &config.query,
         &config.distance,
+        &config.umi_family_model,
+        config.umi_min_fraction,
+        config.umi_auto_neighbor_risk,
+        config.header_match.as_deref(),
         r1_file_path,
         r2_file_path,
         &(file_base_name.clone() + "_summary.csv"),
@@ -155,6 +196,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
                 .unwrap_or("Error converting path to string...")
         );
     }
+    let _ = log_timing("render Quarto report", stage_start);
 
     Ok(())
 }
@@ -172,28 +214,48 @@ pub fn open_fasta_file(
     Ok(fasta::Reader::new(reader))
 }
 
-/// Checks if a sequence contains homopolymers longer than a specified threshold.
+/// Checks if a sequence contains internal homopolymers longer than a specified threshold.
+///
+/// Terminal homopolymers are allowed because short inserts can create long same-base runs at
+/// read boundaries. Internal homopolymers are treated as quality issues.
 /// # Arguments
 /// * `seq` - A byte slice representing the sequence to be checked
 /// # Returns
-/// * `bool` - Returns true if a homopolymer longer than the threshold is found
+/// * `bool` - Returns true if an internal homopolymer longer than the threshold is found
 
 fn homopolymer_check(seq: &[u8]) -> bool {
     let max_homopolymer_length = 10; // TODO consider moving to master config
-    let mut current_char = 0;
-    let mut current_count = 0;
+    if seq.len() <= max_homopolymer_length {
+        return false;
+    }
 
-    for &c in seq {
-        if c == current_char {
+    let mut run_start = 0;
+    let mut current_base = seq[0];
+    let mut current_count = 1;
+
+    for (idx, &base) in seq.iter().enumerate().skip(1) {
+        if base == current_base {
             current_count += 1;
-            if current_count > max_homopolymer_length {
-                return true; // Found a homopolymer longer than the threshold
-            }
         } else {
-            current_char = c;
+            if current_count > max_homopolymer_length && run_start > 0 && idx < seq.len() {
+                return true;
+            }
+
+            current_base = base;
             current_count = 1;
+            run_start = idx;
         }
     }
+
+    if current_count > max_homopolymer_length {
+        let run_end = run_start + current_count;
+        if run_start > 0 && run_end < seq.len() {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     false
 }
 
@@ -215,9 +277,13 @@ mod tests {
 
     #[test]
     fn test_homopolymer_check() {
-        let seq_with_homopolymer = b"AAACCCCTTTTTTTTTTTTGGG";
+        let seq_with_internal_homopolymer = b"AAACCCCTTTTTTTTTTTTGGG";
         let seq_without_homopolymer = b"AAACCCCTTTTGGG";
-        assert!(homopolymer_check(seq_with_homopolymer));
+        let seq_with_terminal_homopolymer = b"AAACCCCTTTTTTTTTTTT";
+        let seq_with_leading_homopolymer = b"AAAAAAAAAAAACCCCTTTT";
+        assert!(homopolymer_check(seq_with_internal_homopolymer));
         assert!(!homopolymer_check(seq_without_homopolymer));
+        assert!(!homopolymer_check(seq_with_terminal_homopolymer));
+        assert!(!homopolymer_check(seq_with_leading_homopolymer));
     }
 }

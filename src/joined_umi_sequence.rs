@@ -11,6 +11,7 @@
 //! processing and splice event detection.
 
 use crate::config::{SpliceConfig, SpliceStep};
+use crate::sequence_filter::matches_iupac_prefix;
 use crate::splice_events::{ProcessedSpliceRec, SpliceChain, SpliceEvents};
 use bio::alignment::Alignment;
 use bio::alphabets::dna;
@@ -105,6 +106,16 @@ impl JoinedUmiSequnce {
         ) {
             self.joined_sequence = Some(joined);
         }
+    }
+
+    /// Checks an IUPAC pattern against the first bases of the original R1 sequence.
+    ///
+    /// Matching starts at R1 base 1 and includes `forward_ns`, the first four bases retained from
+    /// R1 before `forward_sequence`. Use `N` in the pattern where those bases represent a UMI and
+    /// should match any nucleotide.
+    pub fn matches_r1_header(&self, pattern: &str, max_mismatches: u8) -> bool {
+        let r1_sequence = self.forward_ns.clone() + &self.forward_sequence;
+        matches_iupac_prefix(&r1_sequence, pattern, max_mismatches)
     }
 
     /// Converts the joined sequence into a FASTA record.
@@ -723,6 +734,22 @@ mod tests {
         assert_eq!(joined_umi_sequence.joined_sequence, Some("TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT".to_string()));
         assert_eq!(joined_umi_sequence.joined_seq_to_fasta_record(), Some(fasta::Record::with_attrs("seq1_r1-joined", Some("ForwardNs: NNNN, UMI: NNNNNNNNNNNNNN"), b"TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT")));
         assert_eq!(joined_umi_sequence.find_sequence_for_search(), "TTAGTAGAAATTTGTACAGAGATGGAAAAGGAAGGGAAAATTTCAAAAATTGGGCCTGAAAATCCATACAATACTCCAGTATTTGCCATAAAGAAAAAAGACAGTACTAAATGGAGAAAATTAGTAGATTT".to_string());
+    }
+
+    #[test]
+    fn test_matches_r1_header() {
+        let joined_umi_sequence = JoinedUmiSequnce {
+            sequence_id: "test".to_string(),
+            forward_ns: "ACGT".to_string(),
+            umi: "AAAAAAAAAAAAAA".to_string(),
+            forward_sequence: "TTTT".to_string(),
+            reverse_sequence: "CCCC".to_string(),
+            joined_sequence: None,
+        };
+
+        assert!(joined_umi_sequence.matches_r1_header("ACGTT", 0));
+        assert!(joined_umi_sequence.matches_r1_header("ACRTA", 1));
+        assert!(!joined_umi_sequence.matches_r1_header("ACRTA", 0));
     }
 
     #[test]

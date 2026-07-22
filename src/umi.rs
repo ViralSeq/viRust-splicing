@@ -4,8 +4,103 @@ use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use rand_distr::Normal;
 use rayon::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
+
+use crate::config::{DEFAULT_UMI_AUTO_NEIGHBOR_RISK, UMI_AUTO_COVERAGE_RATIO, UmiFamilyModel};
+
+/// Per-category diagnostics and the UMI-family model selected for that category.
+#[derive(Debug, Clone)]
+pub struct UmiFamilyModelDecision {
+    pub effective_model: UmiFamilyModel,
+    pub unique_umi_count: usize,
+    pub unique_umi_fraction: f64,
+    pub neighbor_risk: Option<f64>,
+}
+
+/// Selects the effective UMI-family model for one final category.
+///
+/// Auto mode uses max-model when unique UMIs account for at most 10% of category reads, or when
+/// the expected number of random equal-length UMI neighbors reaches the configured threshold.
+/// Otherwise it uses the standard cluster-model at `max_mismatches`.
+pub fn select_umi_family_model(
+    umis: &[&str],
+    requested_model: &UmiFamilyModel,
+    max_mismatches: u8,
+    auto_neighbor_risk: f64,
+) -> UmiFamilyModelDecision {
+    let mut unique_umis_by_length: HashMap<usize, HashSet<&str>> = HashMap::new();
+    let mut all_umis_are_acgt = true;
+
+    for &umi in umis {
+        all_umis_are_acgt &= umi
+            .bytes()
+            .all(|base| matches!(base, b'A' | b'C' | b'G' | b'T'));
+        unique_umis_by_length
+            .entry(umi.len())
+            .or_default()
+            .insert(umi);
+    }
+
+    let unique_umi_count = unique_umis_by_length.values().map(HashSet::len).sum();
+    let unique_umi_fraction = if umis.is_empty() {
+        0.0
+    } else {
+        unique_umi_count as f64 / umis.len() as f64
+    };
+
+    if *requested_model != UmiFamilyModel::AutoModel {
+        return UmiFamilyModelDecision {
+            effective_model: requested_model.clone(),
+            unique_umi_count,
+            unique_umi_fraction,
+            neighbor_risk: None,
+        };
+    }
+
+    // The random-neighbor model assumes each UMI base is one of A, C, G, or T.
+    let neighbor_risk = all_umis_are_acgt.then(|| {
+        unique_umis_by_length
+            .iter()
+            .map(|(&length, umis)| random_neighbor_risk(umis.len(), length, max_mismatches))
+            .fold(0.0_f64, f64::max)
+    });
+    let effective_model = if unique_umi_fraction <= UMI_AUTO_COVERAGE_RATIO
+        || neighbor_risk.is_none_or(|risk| risk >= auto_neighbor_risk)
+    {
+        UmiFamilyModel::MaxModel
+    } else {
+        UmiFamilyModel::ClusterModel
+    };
+
+    UmiFamilyModelDecision {
+        effective_model,
+        unique_umi_count,
+        unique_umi_fraction,
+        neighbor_risk,
+    }
+}
+
+fn random_neighbor_risk(unique_umi_count: usize, umi_length: usize, max_mismatches: u8) -> f64 {
+    if unique_umi_count <= 1 || max_mismatches == 0 {
+        return 0.0;
+    }
+    if max_mismatches as usize >= umi_length {
+        return (unique_umi_count - 1) as f64;
+    }
+
+    let mut combinations = 1.0_f64;
+    let mut substitutions = 1.0_f64;
+    let mut neighbor_count = 0.0_f64;
+    for mismatches in 1..=max_mismatches as usize {
+        combinations *= (umi_length - mismatches + 1) as f64 / mismatches as f64;
+        substitutions *= 3.0;
+        neighbor_count += combinations * substitutions;
+    }
+
+    let sequence_space = 4.0_f64.powi(umi_length as i32);
+    (unique_umi_count - 1) as f64 * neighbor_count / (sequence_space - 1.0)
+}
 
 /// Finds UMI families based on their frequency in the input list.
 ///
@@ -39,6 +134,177 @@ pub fn find_umi_family(mut umis: Vec<&str>) -> Vec<&str> {
     });
 
     families
+}
+
+/// Assigns each non-singleton UMI family to a representative.
+///
+/// `MaxModel` preserves the existing frequency-cutoff behavior. `ClusterModel` and
+/// `ClusterModelPlusone` build abundance-ordered clusters from equal-length UMIs within the
+/// configured mismatch threshold or that threshold plus one, respectively. Each UMI must be
+/// directly within the threshold of its family parent. Each family must meet
+/// `umi_min_fraction` of reads in its final category, and ties use lexical order. `AutoModel`
+/// should normally be resolved with `select_umi_family_model` before this function is called.
+pub fn find_umi_family_assignments(
+    umis: Vec<&str>,
+    umi_family_model: &UmiFamilyModel,
+    max_mismatches: u8,
+    umi_min_fraction: f64,
+) -> HashMap<String, String> {
+    if umis.is_empty() {
+        return HashMap::new();
+    }
+
+    match umi_family_model {
+        UmiFamilyModel::MaxModel => find_umi_family(umis)
+            .into_iter()
+            .map(|umi| (umi.to_owned(), umi.to_owned()))
+            .collect(),
+        UmiFamilyModel::ClusterModel => {
+            cluster_umi_families(umis, max_mismatches, umi_min_fraction)
+        }
+        UmiFamilyModel::ClusterModelPlusone => {
+            cluster_umi_families(umis, max_mismatches.saturating_add(1), umi_min_fraction)
+        }
+        UmiFamilyModel::AutoModel => {
+            let decision = select_umi_family_model(
+                &umis,
+                umi_family_model,
+                max_mismatches,
+                DEFAULT_UMI_AUTO_NEIGHBOR_RISK,
+            );
+            find_umi_family_assignments(
+                umis,
+                &decision.effective_model,
+                max_mismatches,
+                umi_min_fraction,
+            )
+        }
+    }
+}
+
+fn cluster_umi_families(
+    umis: Vec<&str>,
+    max_mismatches: u8,
+    umi_min_fraction: f64,
+) -> HashMap<String, String> {
+    let mut counts: Vec<(String, usize)> = umis
+        .into_iter()
+        .fold(HashMap::new(), |mut counts, umi| {
+            *counts.entry(umi.to_owned()).or_insert(0) += 1;
+            counts
+        })
+        .into_iter()
+        .collect();
+    counts.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+
+    let mut indices_by_length: HashMap<usize, Vec<usize>> = HashMap::new();
+    for (index, (umi, _)) in counts.iter().enumerate() {
+        indices_by_length.entry(umi.len()).or_default().push(index);
+    }
+
+    let mut candidates_by_chunk: HashMap<(usize, usize, Vec<u8>), Vec<usize>> = HashMap::new();
+    for (&length, indices) in &indices_by_length {
+        if max_mismatches as usize >= length {
+            continue;
+        }
+
+        // With at most d substitutions, two sequences must share at least one of d + 1 chunks.
+        let chunk_count = max_mismatches as usize + 1;
+        for &index in indices {
+            let umi = counts[index].0.as_bytes();
+            for chunk_index in 0..chunk_count {
+                let (start, end) = chunk_bounds(length, chunk_index, chunk_count);
+                candidates_by_chunk
+                    .entry((length, chunk_index, umi[start..end].to_vec()))
+                    .or_default()
+                    .push(index);
+            }
+        }
+    }
+
+    let mut parent_order: Vec<usize> = (0..counts.len()).collect();
+    parent_order.sort_unstable_by(|left, right| {
+        counts[*right]
+            .1
+            .cmp(&counts[*left].1)
+            .then_with(|| counts[*left].0.cmp(&counts[*right].0))
+    });
+
+    let mut assigned_parents = vec![None; counts.len()];
+    let mut family_sizes = vec![0; counts.len()];
+    let total_reads = counts.iter().map(|(_, count)| count).sum::<usize>();
+    let minimum_family_size = (umi_min_fraction * total_reads as f64).ceil() as usize;
+
+    for parent in parent_order {
+        if assigned_parents[parent].is_some() {
+            continue;
+        }
+
+        assigned_parents[parent] = Some(parent);
+        let mut family_size = counts[parent].1;
+        let parent_umi = counts[parent].0.as_bytes();
+        let length = parent_umi.len();
+        let candidate_indices: Vec<usize> = if max_mismatches as usize >= length {
+            indices_by_length[&length].clone()
+        } else {
+            let chunk_count = max_mismatches as usize + 1;
+            let mut candidates = HashSet::new();
+            for chunk_index in 0..chunk_count {
+                let (start, end) = chunk_bounds(length, chunk_index, chunk_count);
+                if let Some(indices) =
+                    candidates_by_chunk.get(&(length, chunk_index, parent_umi[start..end].to_vec()))
+                {
+                    candidates.extend(indices.iter().copied());
+                }
+            }
+            candidates.into_iter().collect()
+        };
+
+        for candidate in candidate_indices {
+            if assigned_parents[candidate].is_none()
+                && hamming_distance_within(
+                    parent_umi,
+                    counts[candidate].0.as_bytes(),
+                    max_mismatches,
+                )
+            {
+                assigned_parents[candidate] = Some(parent);
+                family_size += counts[candidate].1;
+            }
+        }
+        family_sizes[parent] = family_size;
+    }
+
+    counts
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (umi, _))| {
+            let parent = assigned_parents[index].expect("every UMI is assigned to a parent");
+            if family_sizes[parent] < minimum_family_size {
+                return None;
+            }
+            Some((umi.clone(), counts[parent].0.clone()))
+        })
+        .collect()
+}
+
+fn chunk_bounds(length: usize, chunk_index: usize, chunk_count: usize) -> (usize, usize) {
+    let base_length = length / chunk_count;
+    let remainder = length % chunk_count;
+    let start = chunk_index * base_length + chunk_index.min(remainder);
+    let end = start + base_length + usize::from(chunk_index < remainder);
+    (start, end)
+}
+
+fn hamming_distance_within(left: &[u8], right: &[u8], max_mismatches: u8) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .filter(|(left_base, right_base)| left_base != right_base)
+            .take(max_mismatches as usize + 1)
+            .count()
+            <= max_mismatches as usize
 }
 
 /// Generates a single UMI of the specified length using a random seed.
@@ -157,7 +423,7 @@ pub fn simulate_umi_distribution(
 ///
 /// A string representing the mutated UMI.
 pub fn mutate_umi(umi: &str, mutation_rate: f64) -> String {
-    let mut rng = ChaCha8Rng::from_os_rng();
+    let mut rng = ChaCha8Rng::from_rng(&mut rand::rng());
     let bases = ['A', 'T', 'C', 'G'];
     let mut mutated_umi = String::new();
 
@@ -298,6 +564,7 @@ fn umi_cut_off(m: usize) -> i32 {
     if n_rounded < 3 {
         n_rounded = 2;
     }
+
     n_rounded
 }
 
@@ -349,6 +616,174 @@ mod tests {
         let mut families = find_umi_family(umis);
         families.sort();
         assert_eq!(families.len(), 0);
+    }
+
+    #[test]
+    fn test_cluster_umi_family_assignments() {
+        let umis = vec![
+            "AAAAA", "AAAAA", "AAAAA", "AAAAT", "AAAAT", "AAATT", "GGGGG", "AAAA",
+        ];
+
+        let assignments = find_umi_family_assignments(umis, &UmiFamilyModel::ClusterModel, 1, 0.2);
+
+        // AAAAT is directly within one mismatch of AAAAA, but AAATT is not.
+        assert_eq!(assignments["AAAAA"], "AAAAA");
+        assert_eq!(assignments["AAAAT"], "AAAAA");
+        assert!(!assignments.contains_key("AAATT"));
+        assert!(!assignments.contains_key("GGGGG"));
+        assert!(!assignments.contains_key("AAAA"));
+    }
+
+    #[test]
+    fn test_cluster_umi_family_assignments_do_not_chain_distant_umis() {
+        let umis = vec![
+            "AAAAA", "AAAAA", "AAAAA", "AAAAT", "AAAAT", "AAATT", "AAATT",
+        ];
+
+        let assignments =
+            find_umi_family_assignments(umis, &UmiFamilyModel::ClusterModel, 1, 0.005);
+
+        assert_eq!(assignments["AAAAA"], "AAAAA");
+        assert_eq!(assignments["AAAAT"], "AAAAA");
+        assert_eq!(assignments["AAATT"], "AAATT");
+        for (umi, family) in assignments {
+            assert!(hamming_distance_within(
+                umi.as_bytes(),
+                family.as_bytes(),
+                1
+            ));
+        }
+    }
+
+    #[test]
+    fn test_cluster_umi_family_assignments_breaks_frequency_ties_lexically() {
+        let assignments = find_umi_family_assignments(
+            vec!["AAAAT", "AAAAA"],
+            &UmiFamilyModel::ClusterModel,
+            1,
+            0.005,
+        );
+
+        assert_eq!(assignments["AAAAA"], "AAAAA");
+        assert_eq!(assignments["AAAAT"], "AAAAA");
+    }
+
+    #[test]
+    fn test_cluster_umi_family_assignments_respects_configured_mismatches() {
+        let assignments = find_umi_family_assignments(
+            vec!["AAAAA", "AAAAA", "AAATT"],
+            &UmiFamilyModel::ClusterModel,
+            1,
+            0.5,
+        );
+
+        assert_eq!(assignments["AAAAA"], "AAAAA");
+        assert!(!assignments.contains_key("AAATT"));
+    }
+
+    #[test]
+    fn test_cluster_umi_family_assignments_allow_one_extra_mismatch() {
+        let assignments = find_umi_family_assignments(
+            vec!["AAAAA", "AAAAA", "AAATT"],
+            &UmiFamilyModel::ClusterModelPlusone,
+            1,
+            0.5,
+        );
+
+        // AAATT differs from AAAAA by two substitutions: --distance (1) plus one for clustering.
+        assert_eq!(assignments["AAAAA"], "AAAAA");
+        assert_eq!(assignments["AAATT"], "AAAAA");
+    }
+
+    #[test]
+    fn test_cluster_umi_family_assignments_use_relative_cutoff() {
+        let umis = vec!["AAAAA", "AAAAA", "CCCCC", "GGGGG", "TTTTT", "ATATA"];
+
+        let assignments =
+            find_umi_family_assignments(umis.clone(), &UmiFamilyModel::ClusterModel, 0, 0.005);
+        assert_eq!(assignments.len(), 5);
+
+        let assignments = find_umi_family_assignments(umis, &UmiFamilyModel::ClusterModel, 0, 0.2);
+        assert_eq!(assignments.len(), 1);
+        assert_eq!(assignments["AAAAA"], "AAAAA");
+    }
+
+    #[test]
+    fn test_auto_model_uses_max_model_for_sufficient_coverage() {
+        let umis = vec!["AAAAAAAAAAAAAA"; 10];
+        let decision = select_umi_family_model(
+            &umis,
+            &UmiFamilyModel::AutoModel,
+            2,
+            DEFAULT_UMI_AUTO_NEIGHBOR_RISK,
+        );
+
+        assert_eq!(decision.unique_umi_fraction, UMI_AUTO_COVERAGE_RATIO);
+        assert_eq!(decision.neighbor_risk, Some(0.0));
+        assert_eq!(decision.effective_model, UmiFamilyModel::MaxModel);
+    }
+
+    #[test]
+    fn test_auto_model_uses_cluster_model_for_sparse_low_risk_category() {
+        let umis = vec![
+            "AAAAAAAAAAAAAA",
+            "AAAAAAAAAAAAAA",
+            "CAAAAAAAAAAAAA",
+            "GAAAAAAAAAAAA",
+            "TAAAAAAAAAAAA",
+            "ACAAAAAAAAAAAA",
+        ];
+        let decision = select_umi_family_model(
+            &umis,
+            &UmiFamilyModel::AutoModel,
+            2,
+            DEFAULT_UMI_AUTO_NEIGHBOR_RISK,
+        );
+
+        assert_eq!(decision.unique_umi_count, 5);
+        assert_eq!(decision.unique_umi_fraction, 5.0 / 6.0);
+        assert!(decision.neighbor_risk.expect("risk should be available") < 0.05);
+        assert_eq!(decision.effective_model, UmiFamilyModel::ClusterModel);
+    }
+
+    #[test]
+    fn test_auto_model_uses_max_model_when_random_neighbor_risk_is_high() {
+        let umis = vec![
+            "AAAAAA", "AAAAAC", "AAAAAG", "AAAAAT", "AAAACA", "AAAACC", "AAAACG", "AAAACT",
+            "AAAAGA", "AAAAGC", "AAAAGG", "AAAAGT", "AAAATA", "AAAATC", "AAAATG", "AAAATT",
+            "AAACAA", "AAACAC", "AAACAG", "AAACAT",
+        ];
+        let decision = select_umi_family_model(
+            &umis,
+            &UmiFamilyModel::AutoModel,
+            2,
+            DEFAULT_UMI_AUTO_NEIGHBOR_RISK,
+        );
+
+        assert!(random_neighbor_risk(20, 6, 2) > 0.05);
+        assert!(decision.neighbor_risk.expect("risk should be available") > 0.05);
+        assert_eq!(decision.effective_model, UmiFamilyModel::MaxModel);
+
+        let permissive_decision =
+            select_umi_family_model(&umis, &UmiFamilyModel::AutoModel, 2, 0.8);
+        assert_eq!(
+            permissive_decision.effective_model,
+            UmiFamilyModel::ClusterModel
+        );
+    }
+
+    #[test]
+    fn test_auto_model_uses_max_model_when_umi_is_not_acgt() {
+        let umis = vec!["AAAAAN", "CCCCCC"];
+        let decision = select_umi_family_model(
+            &umis,
+            &UmiFamilyModel::AutoModel,
+            1,
+            DEFAULT_UMI_AUTO_NEIGHBOR_RISK,
+        );
+
+        assert_eq!(decision.neighbor_risk, None);
+        assert_eq!(decision.effective_model, UmiFamilyModel::MaxModel);
     }
 
     #[test]

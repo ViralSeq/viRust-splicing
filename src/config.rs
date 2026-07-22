@@ -14,6 +14,7 @@
 //! This module also includes test cases to verify correct behavior of configuration logic.
 
 use crate::ref_sequence::get_ref_seq_from_map;
+use crate::sequence_filter::is_iupac_sequence;
 use clap::{Parser, ValueEnum};
 use config::Config;
 use std::collections::HashMap;
@@ -22,9 +23,11 @@ use std::fmt::Display;
 use std::path::Path;
 use std::process;
 
+pub const UMI_AUTO_COVERAGE_RATIO: f64 = 0.10;
+pub const DEFAULT_UMI_AUTO_NEIGHBOR_RISK: f64 = 0.05;
+
 /// Configuration parsed from CLI input arguments for initiating the splicing pipeline.
 #[derive(Debug, Clone, Parser)]
-///TODO review name/about information below.  Can reimplement version information from ENV here if we start using versioning
 #[command(
     name = "viRust-splicing",
     version = env!("CARGO_PKG_VERSION"),
@@ -35,6 +38,27 @@ pub struct InputConfig {
     pub query: String, // strain name, e.g., NL43
     #[arg(short, long, required = true)]
     pub distance: u8,
+    #[arg(short = 'u', long = "umi", value_enum, default_value_t = UmiFamilyModel::MaxModel)]
+    pub umi_family_model: UmiFamilyModel,
+    #[arg(
+        long = "umiMinFraction",
+        default_value_t = 0.005_f64,
+        value_parser = parse_umi_min_fraction,
+        help = "Minimum UMI-family fraction within a final category for cluster models (0 to 1)."
+    )]
+    pub umi_min_fraction: f64,
+    #[arg(
+        long = "umiAutoNeighborRisk",
+        default_value_t = DEFAULT_UMI_AUTO_NEIGHBOR_RISK,
+        value_parser = parse_umi_auto_neighbor_risk,
+        help = "Maximum expected random UMI neighbors per UMI before auto-model uses max-model (0 or greater)."
+    )]
+    pub umi_auto_neighbor_risk: f64,
+    #[arg(
+        long = "headerMatch",
+        help = "Filter pairs by an IUPAC-aware R1 prefix. Matching starts at R1 base 1, including the first four forward bases; use N at UMI positions to match any base. Allows --distance mismatches."
+    )]
+    pub header_match: Option<String>,
     #[arg(short = '1', long = "file1", required = true)]
     pub filename_r1: String,
     #[arg(short = '2', long = "file2", required = true)]
@@ -95,6 +119,30 @@ pub enum SpliceAssayType {
     SizeSpecific,
 }
 
+/// Strategy used to assign reads to UMI families.
+#[derive(Debug, PartialEq, Clone, ValueEnum)]
+pub enum UmiFamilyModel {
+    /// Keep only exact UMIs whose count passes the frequency cutoff.
+    MaxModel,
+    /// Group equal-length UMIs that differ by at most the configured mismatch distance.
+    ClusterModel,
+    /// Group equal-length UMIs that differ by at most one more than the configured mismatch distance.
+    ClusterModelPlusone,
+    /// Select max-model or cluster-model independently for each final category.
+    AutoModel,
+}
+
+impl Display for UmiFamilyModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UmiFamilyModel::MaxModel => write!(f, "max-model"),
+            UmiFamilyModel::ClusterModel => write!(f, "cluster-model"),
+            UmiFamilyModel::ClusterModelPlusone => write!(f, "cluster-model-plusone"),
+            UmiFamilyModel::AutoModel => write!(f, "auto-model"),
+        }
+    }
+}
+
 impl Display for SpliceAssayType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let assay_str = match self {
@@ -110,6 +158,10 @@ impl InputConfig {
     pub fn new(
         query: String,
         distance: u8,
+        umi_family_model: UmiFamilyModel,
+        umi_min_fraction: f64,
+        umi_auto_neighbor_risk: f64,
+        header_match: Option<String>,
         assay_type: SpliceAssayType,
         filename_r1: String,
         filename_r2: String,
@@ -118,6 +170,10 @@ impl InputConfig {
         InputConfig {
             query,
             distance,
+            umi_family_model,
+            umi_min_fraction,
+            umi_auto_neighbor_risk,
+            header_match,
             assay_type,
             filename_r1,
             filename_r2,
@@ -138,6 +194,15 @@ impl InputConfig {
 
         if Path::new(&input_config.filename_r2).exists() == false {
             return Err(format!("File {} does not exist", input_config.filename_r2).into());
+        }
+
+        if let Some(header_match) = &input_config.header_match {
+            if !is_iupac_sequence(header_match) {
+                return Err(
+                    "--headerMatch must be a non-empty IUPAC nucleotide sequence (ACGTRYSWKMBDHVN)"
+                        .into(),
+                );
+            }
         }
 
         // If output path is set, then ensure it's not a file
@@ -167,6 +232,26 @@ impl InputConfig {
 
         Ok(input_config)
     }
+}
+
+fn parse_umi_min_fraction(value: &str) -> Result<f64, String> {
+    let fraction = value
+        .parse::<f64>()
+        .map_err(|_| "--umiMinFraction must be a number from 0 to 1".to_string())?;
+    if !fraction.is_finite() || !(0.0..=1.0).contains(&fraction) {
+        return Err("--umiMinFraction must be a number from 0 to 1".to_string());
+    }
+    Ok(fraction)
+}
+
+fn parse_umi_auto_neighbor_risk(value: &str) -> Result<f64, String> {
+    let risk = value
+        .parse::<f64>()
+        .map_err(|_| "--umiAutoNeighborRisk must be a non-negative number".to_string())?;
+    if !risk.is_finite() || risk < 0.0 {
+        return Err("--umiAutoNeighborRisk must be a non-negative number".to_string());
+    }
+    Ok(risk)
 }
 
 impl SpliceConfig {
@@ -541,6 +626,114 @@ mod tests {
         assert!(
             valid_long_args.is_ok(),
             "Expected success, but parsing failed with error"
+        );
+        let valid_long_args = valid_long_args.expect("default arguments should parse");
+        assert_eq!(valid_long_args.umi_min_fraction, 0.005);
+        assert_eq!(
+            valid_long_args.umi_auto_neighbor_risk,
+            DEFAULT_UMI_AUTO_NEIGHBOR_RISK
+        );
+
+        let umi_min_fraction_args = InputConfig::try_parse_from([
+            "virust-splicing",
+            "--query",
+            "nl43",
+            "--distance",
+            "1",
+            "--umiMinFraction",
+            "0.01",
+            "--file1",
+            "./sim_data/mockseq_r1.fasta",
+            "--file2",
+            "./sim_data/mockseq_r2.fasta",
+            "--assay",
+            "random-reverse",
+        ])
+        .expect("UMI minimum fraction arguments should parse");
+        assert_eq!(umi_min_fraction_args.umi_min_fraction, 0.01);
+
+        let auto_neighbor_risk_args = InputConfig::try_parse_from([
+            "virust-splicing",
+            "--query",
+            "nl43",
+            "--distance",
+            "1",
+            "--umi",
+            "auto-model",
+            "--umiAutoNeighborRisk",
+            "0.02",
+            "--file1",
+            "./sim_data/mockseq_r1.fasta",
+            "--file2",
+            "./sim_data/mockseq_r2.fasta",
+            "--assay",
+            "random-reverse",
+        ])
+        .expect("auto-model arguments should parse");
+        assert_eq!(
+            auto_neighbor_risk_args.umi_family_model,
+            UmiFamilyModel::AutoModel
+        );
+        assert_eq!(auto_neighbor_risk_args.umi_auto_neighbor_risk, 0.02);
+
+        let header_match_args = InputConfig::try_parse_from([
+            "virust-splicing",
+            "--query",
+            "nl43",
+            "--distance",
+            "1",
+            "--headerMatch",
+            "ARYN",
+            "--file1",
+            "./sim_data/mockseq_r1.fasta",
+            "--file2",
+            "./sim_data/mockseq_r2.fasta",
+            "--assay",
+            "random-reverse",
+        ])
+        .expect("header match arguments should parse");
+        assert_eq!(header_match_args.header_match.as_deref(), Some("ARYN"));
+
+        let cluster_model_args = InputConfig::try_parse_from([
+            "virust-splicing",
+            "--query",
+            "nl43",
+            "--distance",
+            "1",
+            "--umi",
+            "cluster-model",
+            "--file1",
+            "./sim_data/mockseq_r1.fasta",
+            "--file2",
+            "./sim_data/mockseq_r2.fasta",
+            "--assay",
+            "random-reverse",
+        ])
+        .expect("cluster model arguments should parse");
+        assert_eq!(
+            cluster_model_args.umi_family_model,
+            UmiFamilyModel::ClusterModel
+        );
+
+        let cluster_model_plusone_args = InputConfig::try_parse_from([
+            "virust-splicing",
+            "--query",
+            "nl43",
+            "--distance",
+            "1",
+            "--umi",
+            "cluster-model-plusone",
+            "--file1",
+            "./sim_data/mockseq_r1.fasta",
+            "--file2",
+            "./sim_data/mockseq_r2.fasta",
+            "--assay",
+            "random-reverse",
+        ])
+        .expect("cluster plus-one model arguments should parse");
+        assert_eq!(
+            cluster_model_plusone_args.umi_family_model,
+            UmiFamilyModel::ClusterModelPlusone
         );
 
         let valid_short_args = InputConfig::try_parse_from([

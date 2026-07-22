@@ -1,0 +1,4 @@
+sample_name,reference_strain,distance,assay,file_path
+d15,nl43,1,random-reverse,tests/multi_report/test_input/d15/output_strain_nl43_distance_1_assay_random-reverse_summary.csv
+nl43,nl43,1,random-reverse,tests/multi_report/test_input/nl43/output_strain_nl43_distance_1_assay_random-reverse_summary.csv
+d3,nl43_d3,1,random-reverse,tests/multi_report/test_input/d3/output_strain_nl43_d3_distance_1_assay_random-reverse_summary.csv

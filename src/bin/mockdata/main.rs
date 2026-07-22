@@ -1,7 +1,7 @@
 use bio::io::fasta::Record;
 use bio::io::fasta::Writer;
 use csv;
-use rand::Rng;
+use rand::RngExt;
 use rand::prelude::IndexedRandom;
 use regex::Regex;
 use std::error::Error;

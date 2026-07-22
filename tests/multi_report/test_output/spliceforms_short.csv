@@ -1,0 +1,64 @@
+SpliceForm,desc,know_pattern,check_size_class,size_class,step1,step2,step3,step4,step5,step6,step7,step8c,step8,final_des,splice_cat2
+unknown,"unknown, discard",NoD1,N,,D1 absent,,,,,,,,,,Unknown
+unspliced,"unspliced, gag",Yes,N,,D1,gag,,,,,,,,,Unspliced
+D1_A1_D2_D2-unspliced_noD2b,"potential vif, incomplete",Incomplete,Y,,D1,A1,D2,D2-unspliced,Incomplete,,,Incomplete,,Incomplete,Incomplete
+D1_A1_D2_D2-unspliced_D2b_D2b-unspliced,vif,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,D2b-unspliced,,D2b-unspliced,,vif,D1_A1_D2_D2-unspliced_D2b_D2b-unspliced
+D1_A1_D2_D2-unspliced_D2b_A2_noD3,"potential vpr, incomplete",Incomplete,Y,,D1,A1,D2,D2-unspliced,D2b,A2,Incomplete,Incomplete,,Incomplete,Incomplete
+D1_A1_D2_D2-unspliced_D2b_A2_D3_D3-unspliced,vpr,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A2,D3,D3-unspliced,D3-unspliced,vpr,D1_A1_D2_D2-unspliced_D2b_A2_D3_D3-unspliced
+D1_A1_D2_D2-unspliced_D2b_A2_D3_A3,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A2,D3,A3,A3,A3,D1_A1_D2_D2-unspliced_D2b_A2_D3_A3
+D1_A1_D2_D2-unspliced_D2b_A2_D3_A4a,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A2,D3,A4a,A4,A4,D1_A1_D2_D2-unspliced_D2b_A2_D3_A4
+D1_A1_D2_D2-unspliced_D2b_A2_D3_A4b,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A2,D3,A4b,A4,A4,D1_A1_D2_D2-unspliced_D2b_A2_D3_A4
+D1_A1_D2_D2-unspliced_D2b_A2_D3_A4c,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A2,D3,A4c,A4,A4,D1_A1_D2_D2-unspliced_D2b_A2_D3_A4
+D1_A1_D2_D2-unspliced_D2b_A2_D3_A4d,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A2,D3,A4d,A4,A4,D1_A1_D2_D2-unspliced_D2b_A2_D3_A4
+D1_A1_D2_D2-unspliced_D2b_A2_D3_A5a,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A2,D3,A5a,A5,A5,D1_A1_D2_D2-unspliced_D2b_A2_D3_A5
+D1_A1_D2_D2-unspliced_D2b_A2_D3_A5b,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A2,D3,A5b,A5,A5,D1_A1_D2_D2-unspliced_D2b_A2_D3_A5
+D1_A1_D2_D2-unspliced_D2b_A2_D3_A7,nef,Yes,N,1.8kb,D1,A1,D2,D2-unspliced,D2b,A2,D3,A7,A7,A7,D1_A1_D2_D2-unspliced_D2b_A2_D3_A7
+D1_A1_D2_D2-unspliced_D2b_A2_D3_unknown,unknown after D3,No,N,,D1,A1,D2,D2-unspliced,D2b,A2,D3,Incomplete,Incomplete,Incomplete,Incomplete
+D1_A1_D2_D2-unspliced_D2b_A3,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A3,,A3,,A3,D1_A1_D2_D2-unspliced_D2b_A3
+D1_A1_D2_D2-unspliced_D2b_A4a,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A4,,A4a,,A4,D1_A1_D2_D2-unspliced_D2b_A4
+D1_A1_D2_D2-unspliced_D2b_A4b,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A4,,A4b,,A4,D1_A1_D2_D2-unspliced_D2b_A4
+D1_A1_D2_D2-unspliced_D2b_A4c,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A4,,A4c,,A4,D1_A1_D2_D2-unspliced_D2b_A4
+D1_A1_D2_D2-unspliced_D2b_A4d,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A4,,A4d,,A4,D1_A1_D2_D2-unspliced_D2b_A4
+D1_A1_D2_D2-unspliced_D2b_A5a,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A5,,A5a,,A5,D1_A1_D2_D2-unspliced_D2b_A5
+D1_A1_D2_D2-unspliced_D2b_A5b,Cryptic Reads,Yes,Y,,D1,A1,D2,D2-unspliced,D2b,A5,,A5b,,A5,D1_A1_D2_D2-unspliced_D2b_A5
+D1_A1_D2_D2-unspliced_D2b_unknown,unknown after D2b,No,N,,D1,A1,D2,D2-unspliced,D2b,Incomplete,,Incomplete,,Incomplete,Incomplete
+D1_A1_D2_A2_noD3,Incomplete,Incomplete,Y,,D1,A1,D2,A2,,Incomplete,,Incomplete,,Incomplete,Incomplete
+D1_A1_D2_A2_D3_D3-unspliced,vpr,Yes,Y,,D1,A1,D2,A2,D3,D3-unspliced,,D3-unspliced,,vpr,D1_A1_D2_A2_D3_D3-unspliced
+D1_A1_D2_A2_D3_A3,tat,Yes,Y,,D1,A1,D2,A2,D3,A3,,A3,,A3,D1_A1_D2_A2_D3_A3
+D1_A1_D2_A2_D3_A4a,rev or env,Yes,Y,,D1,A1,D2,A2,D3,A4,,A4a,,A4,D1_A1_D2_A2_D3_A4
+D1_A1_D2_A2_D3_A4b,rev or env,Yes,Y,,D1,A1,D2,A2,D3,A4,,A4b,,A4,D1_A1_D2_A2_D3_A4
+D1_A1_D2_A2_D3_A4c,rev or env,Yes,Y,,D1,A1,D2,A2,D3,A4,,A4c,,A4,D1_A1_D2_A2_D3_A4
+D1_A1_D2_A2_D3_A4d,rev or env,Yes,Y,,D1,A1,D2,A2,D3,A4,,A4d,,A4,D1_A1_D2_A2_D3_A4
+D1_A1_D2_A2_D3_A5a,nef or env,Yes,Y,,D1,A1,D2,A2,D3,A5,,A5a,,A5,D1_A1_D2_A2_D3_A5
+D1_A1_D2_A2_D3_A5b,nef or env,Yes,Y,,D1,A1,D2,A2,D3,A5,,A5b,,A5,D1_A1_D2_A2_D3_A5
+D1_A1_D2_A2_D3_A7,nef,Yes,N,1.8kb,D1,A1,D2,A2,D3,A7,,A7,,A7,D1_A1_D2_A2_D3_A7
+D1_A1_D2_A2_D3_unknown,unknown after D3,No,N,,D1,A1,D2,A2,D3,Incomplete,,Incomplete,,Incomplete,Incomplete
+D1_A1_D2_A3,tat,Yes,Y,,D1,A1,D2,A3,,,,A3,,A3,D1_A1_D2_A3
+D1_A1_D2_A4a,rev or env,Yes,Y,,D1,A1,D2,A4,,,,A4a,,A4,D1_A1_D2_A4
+D1_A1_D2_A4b,rev or env,Yes,Y,,D1,A1,D2,A4,,,,A4b,,A4,D1_A1_D2_A4
+D1_A1_D2_A4c,rev or env,Yes,Y,,D1,A1,D2,A4,,,,A4c,,A4,D1_A1_D2_A4
+D1_A1_D2_A4d,rev or env,Yes,Y,,D1,A1,D2,A4,,,,A4d,,A4,D1_A1_D2_A4
+D1_A1_D2_A5a,nef or env,Yes,Y,,D1,A1,D2,A5,,,,A5a,,A5,D1_A1_D2_A5
+D1_A1_D2_A5b,nef or env,Yes,Y,,D1,A1,D2,A5,,,,A5b,,A5,D1_A1_D2_A5
+D1_A1_D2_A7,nef,Yes,N,1.8kb,D1,A1,D2,A7,,,,A7,,A7,D1_A1_D2_A7
+D1_A1_D2_unknown,unknown after D2b,No,N,,D1,A1,D2,Incomplete,,,,Incomplete,,Incomplete,Incomplete
+D1_A1_noD2,Incomplete,Incomplete,Y,,D1,A1,Incomplete,,,,,Incomplete,,Incomplete,Incomplete
+D1_A2_noD3,incomplete,incomplete,Y,,D1,A2,Incomplete,,,,,Incomplete,,Incomplete,Incomplete
+D1_A2_D3_D3-unspliced,vpr,Yes,Y,,D1,A2,D3,D3-unspliced,,,,D3-unspliced,,vpr,D1_A2_D3_D3-unspliced
+D1_A2_D3_A3,tat,Yes,Y,,D1,A2,D3,A3,,,,A3,,A3,D1_A2_D3_A3
+D1_A2_D3_A4a,rev or env,Yes,Y,,D1,A2,D3,A4,,,,A4a,,A4,D1_A2_D3_A4
+D1_A2_D3_A4b,rev or env,Yes,Y,,D1,A2,D3,A4,,,,A4b,,A4,D1_A2_D3_A4
+D1_A2_D3_A4c,rev or env,Yes,Y,,D1,A2,D3,A4,,,,A4c,,A4,D1_A2_D3_A4
+D1_A2_D3_A4d,rev or env,Yes,Y,,D1,A2,D3,A4,,,,A4d,,A4,D1_A2_D3_A4
+D1_A2_D3_A5a,nef or env,Yes,Y,,D1,A2,D3,A5,,,,A5a,,A5,D1_A2_D3_A5
+D1_A2_D3_A5b,nef or env,Yes,Y,,D1,A2,D3,A5,,,,A5b,,A5,D1_A2_D3_A5
+D1_A2_D3_A7,nef,Yes,N,1.8kb,D1,A2,D3,A7,,,,A7,,A7,D1_A2_D3_A7
+D1_A2_D3_unknown,unknown after D3,No,N,,D1,A2,D3,Incomplete,,,,Incomplete,,Incomplete,Incomplete
+D1_A3,tat,Yes,Y,,D1,A3,,,,,,A3,,A3,D1_A3
+D1_A4a,rev or env,Yes,Y,,D1,A4,,,,,,A4a,,A4,D1_A4
+D1_A4b,rev or env,Yes,Y,,D1,A4,,,,,,A4b,,A4,D1_A4
+D1_A4c,rev or env,Yes,Y,,D1,A4,,,,,,A4c,,A4,D1_A4
+D1_A4d,rev or env,Yes,Y,,D1,A4,,,,,,A4d,,A4,D1_A4
+D1_A5a,nef or env,Yes,Y,,D1,A5,,,,,,A5a,,A5,D1_A5
+D1_A5b,nef or env,Yes,Y,,D1,A5,,,,,,A5b,,A5,D1_A5
+D1_A7,nef,Yes,N,1.8kb,D1,A7,,,,,,A7,,A7,D1_A7
