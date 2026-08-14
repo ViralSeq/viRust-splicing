@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-08-14
+
+- Fix an out-of-boundary error in `src/joined_umi_sequence.rs`
+
 ## [0.3.0] - 2026-07-21
 
 - Updated the project for newer Rust/rand compatibility and resolved stale rust-analyzer diagnostics.

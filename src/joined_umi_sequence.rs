@@ -266,21 +266,16 @@ fn process_splice_rec<'a>(
                 //may only need to keep up to 15 bases
 
                 let d1_length = config.d1.len();
-                let query_length = splice_rec.seq.len().min(d1_length + 15); // Limit to the first 15 bases, if the query sequence is shorter, take all of it.
-                if query_length > 0 {
-                    let unknown_sequence_after_d1 = Some(&splice_rec.seq[d1_length..query_length]);
+                let unknown_sequence_after_d1 =
+                    unknown_sequence_after_donor(splice_rec.seq, d1_length, 15);
+                let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
+                    splice_rec.seq,
+                    splice_rec.alternative_d1,
+                    unknown_sequence_after_d1,
+                );
 
-                    let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
-                        splice_rec.seq,
-                        splice_rec.alternative_d1,
-                        unknown_sequence_after_d1,
-                    );
-
-                    // This can be problematic. If there is a mismatch in the first acceptor site, it may pick up the second acceptor site sequence and it may look like another splice isoform.
-                    process_splice_rec(new_splice_rec, chain, config, 9) // Jump to stage 9 to search for D1prime.
-                } else {
-                    splice_rec
-                }
+                // This can be problematic. If there is a mismatch in the first acceptor site, it may pick up the second acceptor site sequence and it may look like another splice isoform.
+                process_splice_rec(new_splice_rec, chain, config, 9) // Jump to stage 9 to search for D1prime.
             }
         }
         // Stage 3: Process D2 (for the A1 branch).
@@ -456,10 +451,9 @@ fn process_splice_rec<'a>(
                 //may only need to keep up to 15 bases
 
                 let d1_length = config.d1.len() + 4; // d1prime is 4 bases downstream of d1. So we add 4 to the length of d1.
-                let query_length = splice_rec.seq.len().min(d1_length + 15); // Limit to the first 15 bases, if the query sequence is shorter, take all of it.
-                if query_length > 0 && query_length > d1_length {
-                    let unknown_sequence_after_d1 = Some(&splice_rec.seq[d1_length..query_length]);
-
+                let unknown_sequence_after_d1 =
+                    unknown_sequence_after_donor(splice_rec.seq, d1_length, 15);
+                if unknown_sequence_after_d1.is_some() {
                     let new_splice_rec = ProcessedSpliceRec::init_with_option_fields(
                         splice_rec.seq,
                         splice_rec.alternative_d1,
@@ -475,6 +469,19 @@ fn process_splice_rec<'a>(
         }
         _ => splice_rec,
     }
+}
+
+fn unknown_sequence_after_donor(
+    sequence: &[u8],
+    donor_length: usize,
+    max_unknown_length: usize,
+) -> Option<&[u8]> {
+    if donor_length >= sequence.len() {
+        return None;
+    }
+
+    let query_length = sequence.len().min(donor_length + max_unknown_length);
+    Some(&sequence[donor_length..query_length])
 }
 
 /// Computes the reverse complement of a DNA sequence.
@@ -694,6 +701,8 @@ pub fn pattern_search_trim_seq_with_donor_batch<'a>(
 mod tests {
 
     use super::*;
+    use crate::config::SpliceAssayType;
+    use std::collections::HashMap;
 
     #[test]
     fn test_reverse_complement() {
@@ -750,6 +759,51 @@ mod tests {
         assert!(joined_umi_sequence.matches_r1_header("ACGTT", 0));
         assert!(joined_umi_sequence.matches_r1_header("ACRTA", 1));
         assert!(!joined_umi_sequence.matches_r1_header("ACRTA", 0));
+    }
+
+    #[test]
+    fn test_unknown_sequence_after_donor_bounds() {
+        assert_eq!(unknown_sequence_after_donor(b"ACGT", 4, 15), None);
+        assert_eq!(unknown_sequence_after_donor(b"ACGT", 5, 15), None);
+        assert_eq!(
+            unknown_sequence_after_donor(b"ACGT", 2, 15),
+            Some(b"GT".as_ref())
+        );
+        assert_eq!(
+            unknown_sequence_after_donor(b"ACGTACGTACGTACGTACGT", 2, 5),
+            Some(b"GTACG".as_ref())
+        );
+    }
+
+    #[test]
+    fn test_process_splice_rec_short_unknown_after_d1_does_not_panic() {
+        let config = SpliceConfig {
+            strain: "test".to_string(),
+            splice_assay_type: SpliceAssayType::KMer,
+            distance: 2,
+            query_list: HashMap::new(),
+            d1: "ACGTACGTACGTA".to_string(),
+            d2: String::new(),
+            d2b: String::new(),
+            d2b_unspliced: String::new(),
+            d3: String::new(),
+            d1_to_all: Vec::new(),
+            d1prime_to_all: Vec::new(),
+            alternative_d1_to_all: Vec::new(),
+            d2_to_all: Vec::new(),
+            d2b_to_all: Vec::new(),
+            d3_to_all: Vec::new(),
+            full_length_sequence: String::new(),
+            d4_breakpoint_position: 0,
+            a7_breakpoint_position: 0,
+        };
+        let mut chain = SpliceChain::new();
+        let rec = ProcessedSpliceRec::init(b"ACGTACGTACGT");
+
+        let processed = process_splice_rec(rec, &mut chain, &config, 2);
+
+        assert_eq!(processed.unknown_sequence_after_d1, None);
+        assert_eq!(chain.splice_event, vec!["unknown".to_string()]);
     }
 
     #[test]
