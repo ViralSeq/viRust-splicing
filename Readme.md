@@ -52,7 +52,8 @@ Usage: virust-splicing [OPTIONS] --query <QUERY> --distance <DISTANCE> --file1 <
 Options:
   -q, --query <QUERY>
   -d, --distance <DISTANCE>
-  -u, --umi <UMI_FAMILY_MODEL>  [default: max-model] [possible values: max-model, cluster-model, cluster-model-plusone, auto-model]
+  -u, --umi <UMI_FAMILY_MODEL>  [default: max-model] [possible values: max-model, fixed-model, cluster-model, cluster-model-plusone, auto-model]
+      --umiFixedCutoff <UMI_FIXED_CUTOFF>  [default: 2] (fixed-model only; debugging)
       --umiMinFraction <UMI_MIN_FRACTION>  [default: 0.005]
       --umiAutoNeighborRisk <UMI_AUTO_NEIGHBOR_RISK>  [default: 0.05]
       --headerMatch <HEADER_MATCH>
@@ -76,14 +77,17 @@ cargo run --release -- --query nl43 --distance 1 --assay random-reverse --file1 
 ### UMI family models
 
 The `--umi` option defines UMI families independently within each `final_category`. The default
-is `max-model`; the available values are `max-model`, `cluster-model`,
+is `max-model`; the available values are `max-model`, `fixed-model`, `cluster-model`,
 `cluster-model-plusone`, and `auto-model`.
 
 #### Max model
 
 `max-model` is an exact-UMI, conservative approach. It counts every distinct UMI in a category,
-finds the most abundant UMI, and uses that maximum count to select a simulation-derived frequency
-cutoff. Exact UMIs must have a count strictly above that cutoff to be retained as families. The
+and selects a reference frequency to calculate a simulation-derived cutoff. With more than five
+distinct UMIs, the reference is the arithmetic mean of the five highest read counts, rounded to
+the nearest integer (halves up). With five or fewer distinct UMIs, the reference is the maximum
+count. Averaging the top five reduces the influence of a single unusually abundant UMI. Exact
+UMIs must have a count strictly above the cutoff to be retained as families. The
 underlying simulation asked at what count low-frequency UMI variants can no longer be reliably
 distinguished from offspring of an abundant parent UMI. This makes the model deliberately
 conservative: it does not merge similar UMI sequences and it may discard sparse, singleton-heavy
@@ -95,6 +99,27 @@ the category has sufficient UMI coverage. The underlying Primer ID study is: Zho
 Mieczkowski P, Swanstrom R. _Primer ID Validates Template Sampling Depth and Greatly Reduces the
 Error Rate of Next-Generation Sequencing of HIV-1 Genomic RNA Populations._ Journal of Virology
 89(16):8540-8555 (2015). [doi:10.1128/JVI.00522-15](https://doi.org/10.1128/JVI.00522-15).
+
+#### Fixed model (debugging only)
+
+Use `--umi fixed-model` to apply a fixed frequency cutoff to exact UMIs within each
+`final_category`. The cutoff defaults to `2`: UMIs must occur **more than twice** (at least three
+reads) to qualify as families. UMIs at or below the cutoff are excluded; similar sequences are
+not merged. The model ignores `--distance` and `--umiMinFraction` when assigning families.
+
+Set `--umiFixedCutoff` to a nonnegative integer to override the cutoff. For example, a cutoff
+of `5` retains UMIs with at least six reads:
+
+```bash
+cargo run --release -- --query nl43 --distance 1 --assay random-reverse \
+  --file1 ./sample_data/mock_data_r1.fasta.gz \
+  --file2 ./sample_data/mock_data_r2.fasta.gz \
+  --umi fixed-model --umiFixedCutoff 5 -o ./
+```
+
+This model is intended for debugging. The default for `--umi` remains `max-model`, and
+`auto-model` continues to choose only between `max-model` and `cluster-model`. Output rows use
+`fixed-model` in `umi_model_used`, and the HTML report includes the configured fixed cutoff.
 
 #### Cluster models
 
@@ -154,7 +179,7 @@ and per-category diagnostics are written to the output TSV as `umi_model_used`,
 For either cluster model, `--umiMinFraction` sets the minimum family fraction within each
 `final_category`; it defaults to `0.005` (0.5%). The threshold is
 `ceil(umiMinFraction * reads_in_final_category)`, so shallow categories can retain singleton
-families. This option does not affect `max-model`.
+families. This option does not affect `max-model` or `fixed-model`.
 
 The output TSV reports `umi_family_size` and `umi_family_fraction` for each retained family,
 plus the actual `umi_model_used`, `umi_unique_count`, `umi_unique_fraction`, and

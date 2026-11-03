@@ -23,6 +23,8 @@ use std::fmt::Display;
 use std::path::Path;
 use std::process;
 
+pub const DEFAULT_UMI_FIXED_CUTOFF: usize = 2;
+
 pub const UMI_AUTO_COVERAGE_RATIO: f64 = 0.10;
 pub const DEFAULT_UMI_AUTO_NEIGHBOR_RISK: f64 = 0.05;
 
@@ -40,6 +42,12 @@ pub struct InputConfig {
     pub distance: u8,
     #[arg(short = 'u', long = "umi", value_enum, default_value_t = UmiFamilyModel::MaxModel)]
     pub umi_family_model: UmiFamilyModel,
+    #[arg(
+        long = "umiFixedCutoff",
+        default_value_t = DEFAULT_UMI_FIXED_CUTOFF,
+        help = "Debugging only: retain exact UMIs with counts strictly greater than this value in fixed-model."
+    )]
+    pub umi_fixed_cutoff: usize,
     #[arg(
         long = "umiMinFraction",
         default_value_t = 0.005_f64,
@@ -124,6 +132,8 @@ pub enum SpliceAssayType {
 pub enum UmiFamilyModel {
     /// Keep only exact UMIs whose count passes the frequency cutoff.
     MaxModel,
+    /// Debugging only: keep exact UMIs whose count exceeds --umiFixedCutoff (default 2).
+    FixedModel,
     /// Group equal-length UMIs that differ by at most the configured mismatch distance.
     ClusterModel,
     /// Group equal-length UMIs that differ by at most one more than the configured mismatch distance.
@@ -135,6 +145,7 @@ pub enum UmiFamilyModel {
 impl Display for UmiFamilyModel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            UmiFamilyModel::FixedModel => write!(f, "fixed-model"),
             UmiFamilyModel::MaxModel => write!(f, "max-model"),
             UmiFamilyModel::ClusterModel => write!(f, "cluster-model"),
             UmiFamilyModel::ClusterModelPlusone => write!(f, "cluster-model-plusone"),
@@ -171,6 +182,7 @@ impl InputConfig {
             query,
             distance,
             umi_family_model,
+            umi_fixed_cutoff: DEFAULT_UMI_FIXED_CUTOFF,
             umi_min_fraction,
             umi_auto_neighbor_risk,
             header_match,
@@ -501,6 +513,43 @@ impl SpliceStep {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_fixed_model_cli() {
+        let base = [
+            "virust-splicing",
+            "-q",
+            "nl43",
+            "-d",
+            "1",
+            "-1",
+            "r1",
+            "-2",
+            "r2",
+            "-a",
+            "random-reverse",
+        ];
+        let defaults = InputConfig::try_parse_from(base).unwrap();
+        assert_eq!(defaults.umi_family_model, UmiFamilyModel::MaxModel);
+        assert_eq!(defaults.umi_fixed_cutoff, 2);
+        let fixed =
+            InputConfig::try_parse_from(base.into_iter().chain(["-u", "fixed-model"])).unwrap();
+        assert_eq!(fixed.umi_family_model, UmiFamilyModel::FixedModel);
+        assert_eq!(fixed.umi_fixed_cutoff, 2);
+        assert_eq!(fixed.umi_family_model.to_string(), "fixed-model");
+        let custom = InputConfig::try_parse_from(base.into_iter().chain([
+            "--umi",
+            "fixed-model",
+            "--umiFixedCutoff",
+            "5",
+        ]))
+        .unwrap();
+        assert_eq!(custom.umi_fixed_cutoff, 5);
+        assert!(
+            InputConfig::try_parse_from(base.into_iter().chain(["--umiFixedCutoff", "-1"]))
+                .is_err()
+        );
+    }
 
     #[test]
     fn test_splice_config() {

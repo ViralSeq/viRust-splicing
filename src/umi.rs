@@ -111,6 +111,10 @@ fn random_neighbor_risk(unique_umi_count: usize, umi_length: usize, max_mismatch
 /// # Returns
 ///
 /// A vector of UMI strings that belong to families based on a frequency cutoff.
+/// With more than five distinct UMIs, the cutoff uses the mean of the five
+/// highest read counts, rounded to the nearest integer (halves up). With five
+/// or fewer distinct UMIs, it uses the maximum. Counts must strictly exceed the cutoff.
+/// Empty input returns no families.
 pub fn find_umi_family(mut umis: Vec<&str>) -> Vec<&str> {
     let mut families: Vec<&str> = Vec::new();
 
@@ -123,9 +127,11 @@ pub fn find_umi_family(mut umis: Vec<&str>) -> Vec<&str> {
         freq_count.push(count);
     });
 
-    let max_freq = freq_count.iter().max().unwrap();
-
-    let umi_cut_off = umi_cut_off(*max_freq);
+    if freq_count.is_empty() {
+        return families;
+    }
+    let reference_freq = top_five_mean(&mut freq_count);
+    let umi_cut_off = umi_cut_off(reference_freq);
 
     umi_freq.into_iter().for_each(|(count, umi)| {
         if count > umi_cut_off as usize {
@@ -136,8 +142,22 @@ pub fn find_umi_family(mut umis: Vec<&str>) -> Vec<&str> {
     families
 }
 
+/// Requires nonempty counts. Uses the maximum for at most five distinct UMIs,
+/// otherwise the top-five mean rounded to nearest, halves up.
+fn top_five_mean(counts: &mut [usize]) -> usize {
+    counts.sort_unstable_by(|left, right| right.cmp(left));
+    if counts.len() <= 5 {
+        return counts[0];
+    }
+    let top_count = 5;
+    // A wider accumulator avoids overflowing when summing usize counts.
+    let total: u128 = counts[..top_count].iter().map(|&count| count as u128).sum();
+    ((total + top_count as u128 / 2) / top_count as u128) as usize
+}
+
 /// Assigns each non-singleton UMI family to a representative.
 ///
+/// `FixedModel` retains exact UMIs whose counts exceed the fixed cutoff (default 2).
 /// `MaxModel` preserves the existing frequency-cutoff behavior. `ClusterModel` and
 /// `ClusterModelPlusone` build abundance-ordered clusters from equal-length UMIs within the
 /// configured mismatch threshold or that threshold plus one, respectively. Each UMI must be
@@ -150,11 +170,39 @@ pub fn find_umi_family_assignments(
     max_mismatches: u8,
     umi_min_fraction: f64,
 ) -> HashMap<String, String> {
+    find_umi_family_assignments_with_cutoff(
+        umis,
+        umi_family_model,
+        max_mismatches,
+        umi_min_fraction,
+        crate::config::DEFAULT_UMI_FIXED_CUTOFF,
+    )
+}
+
+/// Assigns UMI families with a configurable strict count cutoff for fixed-model.
+pub fn find_umi_family_assignments_with_cutoff(
+    umis: Vec<&str>,
+    umi_family_model: &UmiFamilyModel,
+    max_mismatches: u8,
+    umi_min_fraction: f64,
+    fixed_cutoff: usize,
+) -> HashMap<String, String> {
     if umis.is_empty() {
         return HashMap::new();
     }
 
     match umi_family_model {
+        UmiFamilyModel::FixedModel => {
+            let mut counts = HashMap::new();
+            for umi in umis {
+                *counts.entry(umi).or_insert(0_usize) += 1;
+            }
+            counts
+                .into_iter()
+                .filter(|(_, count)| *count > fixed_cutoff)
+                .map(|(umi, _)| (umi.to_owned(), umi.to_owned()))
+                .collect()
+        }
         UmiFamilyModel::MaxModel => find_umi_family(umis)
             .into_iter()
             .map(|umi| (umi.to_owned(), umi.to_owned()))
@@ -172,11 +220,12 @@ pub fn find_umi_family_assignments(
                 max_mismatches,
                 DEFAULT_UMI_AUTO_NEIGHBOR_RISK,
             );
-            find_umi_family_assignments(
+            find_umi_family_assignments_with_cutoff(
                 umis,
                 &decision.effective_model,
                 max_mismatches,
                 umi_min_fraction,
+                fixed_cutoff,
             )
         }
     }
@@ -574,6 +623,35 @@ mod tests {
     use std::iter::repeat;
 
     #[test]
+    fn test_fixed_model_strict_cutoff() {
+        let umis = vec![
+            "A", "AA", "AA", "AAA", "AAA", "AAA", "AAAA", "AAAA", "AAAA", "AAAA",
+        ];
+        let families =
+            find_umi_family_assignments(umis.clone(), &UmiFamilyModel::FixedModel, 10, 1.0);
+        assert_eq!(
+            families,
+            HashMap::from([("AAA".into(), "AAA".into()), ("AAAA".into(), "AAAA".into())])
+        );
+        let custom = find_umi_family_assignments_with_cutoff(
+            umis.clone(),
+            &UmiFamilyModel::FixedModel,
+            10,
+            1.0,
+            3,
+        );
+        assert_eq!(custom, HashMap::from([("AAAA".into(), "AAAA".into())]));
+        assert_eq!(
+            find_umi_family_assignments_with_cutoff(umis, &UmiFamilyModel::FixedModel, 0, 0.0, 0)
+                .len(),
+            4
+        );
+        assert!(
+            find_umi_family_assignments(Vec::new(), &UmiFamilyModel::FixedModel, 1, 0.0).is_empty()
+        );
+    }
+
+    #[test]
     fn test_umi_cut_off() {
         assert_eq!(umi_cut_off(9), 2);
         assert_eq!(umi_cut_off(100), 3);
@@ -616,6 +694,57 @@ mod tests {
         let mut families = find_umi_family(umis);
         families.sort();
         assert_eq!(families.len(), 0);
+    }
+
+    #[test]
+    fn test_top_five_mean_rounding() {
+        assert_eq!(top_five_mean(&mut [7]), 7);
+        assert_eq!(top_five_mean(&mut [1, 9, 3, 2]), 9);
+        // Five distinct UMIs use the maximum; six use the five highest counts.
+        assert_eq!(top_five_mean(&mut [1, 10, 2, 3, 4]), 10);
+        assert_eq!(top_five_mean(&mut [1, 10, 2, 3, 4, 1]), 4);
+        // Top-five means 4.4 and 4.6 round down and up, respectively.
+        assert_eq!(top_five_mean(&mut [1, 10, 2, 3, 5, 2]), 4);
+        assert_eq!(top_five_mean(&mut [1, 11, 2, 3, 5, 2]), 5);
+        // Lower-frequency UMIs do not affect the reference.
+        let mut counts = vec![100, 80, 60, 40, 20];
+        counts.extend(vec![1; 100]);
+        assert_eq!(top_five_mean(&mut counts), 60);
+        assert_eq!(top_five_mean(&mut [usize::MAX; 6]), usize::MAX);
+    }
+
+    #[test]
+    fn test_find_umi_family_empty() {
+        assert!(find_umi_family(Vec::new()).is_empty());
+    }
+
+    #[test]
+    fn test_find_umi_family_single_distinct_umi() {
+        assert!(find_umi_family(vec!["AAAA"; 2]).is_empty());
+        assert_eq!(find_umi_family(vec!["AAAA"; 3]), vec!["AAAA"]);
+    }
+
+    #[test]
+    fn test_find_umi_family_top_five_resists_outlier() {
+        let labels: Vec<String> = (0..30).map(|index| format!("UMI{index:02}")).collect();
+        let mut umis = Vec::new();
+        for (index, label) in labels.iter().enumerate() {
+            let count = match index {
+                0 => 5000,
+                1 | 2 => 100,
+                3 => 15,
+                4 => 4,
+                _ => 3,
+            };
+            umis.extend(repeat(label.as_str()).take(count));
+        }
+        // Top five [5000, 100, 100, 15, 4] give rounded mean 1044.
+        // The maximum-based cutoff (18) discarded the fifteen-read UMI.
+        assert!(umi_cut_off(1044) >= 4 && umi_cut_off(1044) < 15);
+        assert_eq!(
+            find_umi_family(umis),
+            labels[..4].iter().map(String::as_str).collect::<Vec<_>>()
+        );
     }
 
     #[test]

@@ -1,7 +1,7 @@
 use bio::io::fasta;
 use rayon::prelude::*;
 use runner::*;
-use splice_events::find_umi_family_from_events;
+use splice_events::find_umi_family_from_events_with_cutoff;
 use std::error::Error;
 use std::fs::File;
 use std::io::BufReader;
@@ -107,12 +107,13 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
     #[cfg(debug_assertions)]
     dbg!(println!("{:#?}", splice_events));
 
-    let splice_events_with_umi_family = find_umi_family_from_events(
+    let splice_events_with_umi_family = find_umi_family_from_events_with_cutoff(
         splice_events,
         &config.umi_family_model,
         config.distance,
         config.umi_min_fraction,
         config.umi_auto_neighbor_risk,
+        config.umi_fixed_cutoff,
     );
     stage_start = log_timing("assign UMI families", stage_start);
 
@@ -185,6 +186,7 @@ pub fn run(config: InputConfig) -> Result<(), Box<dyn Error>> {
         r2_file_path,
         &(file_base_name.clone() + "_summary.csv"),
         output_path,
+        config.umi_fixed_cutoff,
     ) {
         println!("Quarto report generation failed: {}", e);
     } else {

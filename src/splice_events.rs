@@ -52,7 +52,7 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::config::{SpliceAssayType, SpliceConfig, UmiFamilyModel};
 use crate::joined_umi_sequence::{JoinedUmiSequnce, pattern_search};
-use crate::umi::{find_umi_family_assignments, select_umi_family_model};
+use crate::umi::{find_umi_family_assignments_with_cutoff, select_umi_family_model};
 
 /// MARK: SpliceEvents
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -388,6 +388,25 @@ pub fn find_umi_family_from_events(
     umi_min_fraction: f64,
     umi_auto_neighbor_risk: f64,
 ) -> Vec<SpliceEvents> {
+    find_umi_family_from_events_with_cutoff(
+        events,
+        umi_family_model,
+        max_mismatches,
+        umi_min_fraction,
+        umi_auto_neighbor_risk,
+        crate::config::DEFAULT_UMI_FIXED_CUTOFF,
+    )
+}
+
+/// Assigns families per category, including the debugging fixed-model cutoff.
+pub fn find_umi_family_from_events_with_cutoff(
+    events: Vec<SpliceEvents>,
+    umi_family_model: &UmiFamilyModel,
+    max_mismatches: u8,
+    umi_min_fraction: f64,
+    umi_auto_neighbor_risk: f64,
+    fixed_cutoff: usize,
+) -> Vec<SpliceEvents> {
     let events_by_final_category = group_by_final_category(events);
     let mut outcome_events = Vec::new();
 
@@ -400,11 +419,12 @@ pub fn find_umi_family_from_events(
             umi_auto_neighbor_risk,
         );
 
-        let family_assignments = find_umi_family_assignments(
+        let family_assignments = find_umi_family_assignments_with_cutoff(
             umis,
             &model_decision.effective_model,
             max_mismatches,
             umi_min_fraction,
+            fixed_cutoff,
         );
         let mut family_sizes: HashMap<&str, usize> = HashMap::new();
         for umi in events.iter().map(|event| event.umi.as_str()) {
@@ -756,6 +776,44 @@ mod tests {
         assert_eq!(aaaaa_family.umi_unique_count, Some(4));
         assert_eq!(aaaaa_family.umi_unique_fraction, Some(4.0 / 1555.0));
         assert_eq!(aaaaa_family.umi_neighbor_risk, None);
+
+        // Fixed-model uses per-category exact counts and records its model name.
+        let fixed_events: Vec<_> = events
+            .iter()
+            .cloned()
+            .map(|mut event| {
+                event.umi_family = None;
+                event
+            })
+            .collect();
+        let fixed = find_umi_family_from_events_with_cutoff(
+            fixed_events,
+            &UmiFamilyModel::FixedModel,
+            1,
+            0.005,
+            0.05,
+            5,
+        );
+        for event in &fixed {
+            assert_eq!(event.umi_model_used.as_deref(), Some("fixed-model"));
+            if event.umi == "CCCCC" {
+                assert!(event.umi_family.is_none());
+            } else {
+                assert_eq!(event.umi_family.as_deref(), Some(event.umi.as_str()));
+            }
+        }
+        let fixed_defaults = find_umi_family_from_events(
+            events.clone(),
+            &UmiFamilyModel::FixedModel,
+            1,
+            0.005,
+            0.05,
+        );
+        assert!(
+            fixed_defaults
+                .iter()
+                .all(|event| event.umi_family.is_some())
+        );
 
         let group = group_by_final_category(events);
 

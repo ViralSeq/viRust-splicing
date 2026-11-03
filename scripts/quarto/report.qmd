@@ -31,6 +31,7 @@ params:
   strain: "nl43"
   mismatch: 1
   umi_family_model: "max-model"
+  umi_fixed_cutoff: 2
   umi_min_fraction: 0.005
   umi_auto_neighbor_risk: 0.05
   umi_auto_coverage_ratio: 0.10
@@ -91,7 +92,7 @@ umi_family_model = params$umi_family_model
 umi_min_fraction = params$umi_min_fraction
 umi_auto_neighbor_risk = params$umi_auto_neighbor_risk
 umi_auto_coverage_ratio = params$umi_auto_coverage_ratio
-umi_min_fraction_display = if (umi_family_model == "max-model") "N/A" else umi_min_fraction
+umi_min_fraction_display = if (umi_family_model %in% c("max-model", "fixed-model")) "N/A" else umi_min_fraction
 umi_family_mismatch_allowed = if (umi_family_model == "cluster-model") mismatch else if (umi_family_model == "cluster-model-plusone") mismatch + 1 else if (umi_family_model == "auto-model") paste0("per category: exact or ", mismatch) else "N/A"
 umi_auto_settings_display = if (umi_family_model == "auto-model") paste0("max-model when unique UMI fraction is <= ", umi_auto_coverage_ratio, " or neighbor risk is >= ", umi_auto_neighbor_risk) else "N/A"
 header_match = params$header_match
@@ -284,6 +285,8 @@ Report generated on `r format(Sys.time(), "%Y-%m-%d %H:%M:%S")`
 **Mismatch allowed:** `r mismatch`
 
 **UMI family model:** `r umi_family_model`
+
+**Fixed UMI cutoff (debugging):** `r if (umi_family_model == "fixed-model") paste0("count > ", params$umi_fixed_cutoff) else "N/A"`
 
 **Minimum UMI family fraction:** `r umi_min_fraction_display`
 

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - unreleased
+
+- Add a debugging `fix-model` for UMI calling
+- In `max-model`, averaging the top five reduces the influence of a single unusually abundant UMI.
+
 ## [0.3.1] - 2026-08-14
 
 - Fix an out-of-boundary error in `src/joined_umi_sequence.rs`
